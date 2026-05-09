@@ -82,6 +82,8 @@ func (hs *HTTPServer) OAuthLogin(ctx *models.ReqContext) {
 
 		hashedState := hashStatecode(state, setting.OAuthService.OAuthInfos[name].ClientSecret)
 		cookies.WriteCookie(ctx.Resp, OauthStateCookieName, hashedState, hs.Cfg.OAuthCookieMaxAge, hs.CookieOptionsFromCfg)
+		callbackPath := setting.AppSubUrl + "/public/oauth-callback.html"
+		cookies.WriteCookie(ctx.Resp, "redirect_to", url.QueryEscape(callbackPath), 0, hs.CookieOptionsFromCfg)
 		if setting.OAuthService.OAuthInfos[name].HostedDomain == "" {
 			ctx.Redirect(connect.AuthCodeURL(state, oauth2.AccessTypeOnline))
 		} else {

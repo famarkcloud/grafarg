@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Organization Setup</title>
+    <style>
+      :root {
+        --bg-1: #141619;
+        --panel: rgba(18, 28, 41, 0.65);
+        --border: rgba(255, 255, 255, 0.05);
+        --text-strong: #f7f8fa;
+        --text: #c7d0d9;
+        --text-muted: #9fa7b3;
+        --accent: #3274d9;
+        --accent-2: #1f60c4;
+        --danger: #e02f44;
+        --input-bg: #0b0c0e;
+        --input-border: #2c3235;
+        --input-border-hover: #464c54;
+        --input-focus: #5794f2;
+        --input-text: #c7d0d9;
+        --secondary-from: #202226;
+        --secondary-to: #2b2d30;
+        --secondary-border: #2c3235;
+        --secondary-text: #d8d9da;
+        --required: #ecbb13;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: "Roboto", "Helvetica Neue", Arial, sans-serif;
+        color: var(--text);
+        background: url("/public/img/login_background_dark.svg") center / cover no-repeat, var(--bg-1);
+      }
+
+      main {
+        min-height: 100vh;
+        min-width: 100%;
+        margin-left: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .login-content {
+        max-width: 550px;
+        width: 100%;
+        display: flex;
+        align-items: stretch;
+        flex-direction: column;
+        position: relative;
+        justify-content: center;
+        z-index: 1;
+        min-height: 320px;
+        border-radius: 3px;
+        padding: 20px 0;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        box-shadow: 0 20px 50px rgba(3, 10, 18, 0.6);
+        backdrop-filter: blur(6px);
+        display: none;
+      }
+
+      .login-logo-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+      }
+
+      .login-logo {
+        width: 100%;
+        max-width: 100px;
+        margin-bottom: 15px;
+      }
+
+      .title-wrapper {
+        text-align: center;
+      }
+
+      .main-title {
+        margin: 0;
+        font-size: 32px;
+        color: var(--text-strong);
+      }
+
+      .sub-title {
+        margin: 6px 0 0;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 400;
+      }
+
+      .login-outer-box {
+        display: flex;
+        overflow-y: hidden;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .login-inner-box {
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex-grow: 1;
+        max-width: 415px;
+        width: 100%;
+        transform: translate(0px, 0px);
+        transition: 0.25s ease;
+      }
+
+      .login-inner-box form {
+        width: 100%;
+      }
+
+      .form-field {
+        width: 100%;
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 4px;
+        color: var(--text-muted);
+      }
+
+      .required-mark {
+        color: var(--required);
+        margin-left: 4px;
+      }
+
+      input {
+        width: 100%;
+        height: 32px;
+        padding: 0 8px;
+        border: 1px solid var(--input-border);
+        border-radius: 2px;
+        background: var(--input-bg);
+        color: var(--input-text);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: var(--input-focus);
+        box-shadow: 0 0 0 2px rgba(31, 96, 196, 0.35);
+      }
+
+      input:hover {
+        border-color: var(--input-border-hover);
+      }
+
+      .actions {
+        display: grid;
+        gap: 8px;
+        margin-top: 8px;
+        width: 100%;
+      }
+
+      button {
+        width: 100%;
+        padding: 0 16px;
+        height: 32px;
+        border: 1px solid var(--accent);
+        border-radius: 2px;
+        background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: var(--accent);
+      }
+
+      .secondary {
+        border-color: var(--secondary-border);
+        background: linear-gradient(180deg, var(--secondary-from) 0%, var(--secondary-to) 100%);
+        color: var(--secondary-text);
+      }
+
+      .secondary:hover {
+        background: var(--secondary-from);
+      }
+
+      button[disabled] {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+
+      .message {
+        margin-top: 12px;
+        font-size: 13px;
+        min-height: 18px;
+        color: var(--text-muted);
+      }
+
+      .message.error {
+        color: var(--danger);
+      }
+
+      @media (max-width: 480px) {
+        .login-content {
+          border-radius: 0;
+        }
+
+        .login-inner-box {
+          padding: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="login-content">
+        <div class="login-logo-wrapper">
+          <img class="login-logo" src="/public/img/grafarg_icon.svg" alt="Grafarg" />
+          <div class="title-wrapper">
+            <h1 class="main-title">Welcome to Grafarg</h1>
+            <h3 class="sub-title">Set your organization name</h3>
+          </div>
+        </div>
+        <div class="login-outer-box">
+          <div class="login-inner-box">
+            <form id="orgForm" novalidate>
+              <div class="form-field">
+                <label for="orgName">
+                  Organization name
+                  <span id="requiredMark" class="required-mark" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="orgName"
+                  name="orgName"
+                  type="text"
+                  autocomplete="organization"
+                  placeholder="e.g. Acme Inc"
+                  required
+                />
+              </div>
+              <div class="actions">
+                <button type="submit" id="submitBtn">Set organization</button>
+                <button type="button" id="skipBtn" class="secondary">Skip for now</button>
+              </div>
+              <div class="message" id="message" role="status"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (() => {
+        const form = document.getElementById("orgForm");
+        const orgNameInput = document.getElementById("orgName");
+        const submitBtn = document.getElementById("submitBtn");
+        const skipBtn = document.getElementById("skipBtn");
+        const message = document.getElementById("message");
+        const requiredMark = document.getElementById("requiredMark");
+        const loginContent = document.querySelector(".login-content");
+
+        let requiredChange = false;
+        let email = "";
+        let login = "";
+
+        const qs = new URLSearchParams(window.location.search);
+        const publicFileName = "/public/oauth-callback.html";
+        const pathName = window.location.pathname;
+        const basePath = pathName.endsWith(publicFileName)
+          ? pathName.slice(0, -publicFileName.length)
+          : "";
+        const apiUrl = (path) => `${basePath}${path}`;
+        const defaultRedirect = basePath ? `${basePath}/` : "/";
+        const redirectParam = qs.get("redirect") || "";
+        const redirectUrl =
+          redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+            ? redirectParam
+            : defaultRedirect;
+
+        const setMessage = (text, isError = false) => {
+          message.textContent = text;
+          message.classList.toggle("error", isError);
+        };
+
+        const setLoading = (isLoading) => {
+          submitBtn.disabled = isLoading;
+          skipBtn.disabled = isLoading;
+          submitBtn.textContent = isLoading
+            ? "Setting..."
+            : "Set organization";
+        };
+
+        const redirectHome = () => {
+          window.location.assign(redirectUrl);
+        };
+
+        const fetchJson = async (url, options) => {
+          const response = await fetch(url, options);
+          let body = null;
+          try {
+            body = await response.json();
+          } catch (err) {}
+          if (!response.ok) {
+            const details = body?.message || response.statusText;
+            throw new Error(details || "Request failed");
+          }
+          return body;
+        };
+
+        const loadData = async () => {
+          setLoading(true);
+          setMessage("Loading...");
+
+          try {
+            const user = await fetchJson(apiUrl("/api/user"));
+            const org = await fetchJson(apiUrl("/api/org"));
+
+            email = user?.email || "";
+            login = user?.login || "";
+            const orgName = org?.name || "";
+
+            requiredChange = orgName !== "" && (orgName === email || orgName === login);
+            if (!(orgName === "" || orgName === email || orgName === login)) {
+              redirectHome();
+              return;
+            }
+             
+            loginContent.style.display = "block";
+
+            requiredMark.hidden = !requiredChange;
+            skipBtn.style.display = requiredChange ? "none" : "";
+            setMessage("");
+          } catch (err) {
+            setMessage(err.message || "Failed to load organization.", true);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        skipBtn.addEventListener("click", () => {
+          redirectHome();
+        });
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          setMessage("");
+
+          const orgName = orgNameInput.value;
+          if (!orgName) {
+            setMessage("Organization name is required.", true);
+            return;
+          }
+
+          if (requiredChange && (orgName === email || orgName === login)) {
+            setMessage("Organization name must be different from your email or username.", true);
+            return;
+          }
+
+          setLoading(true);
+
+          try {
+            await fetchJson(apiUrl("/api/org"), {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ name: orgName }),
+            });
+
+            setMessage("Organization set. Redirecting...");
+            setTimeout(redirectHome, 300);
+          } catch (err) {
+            setMessage(err.message || "Request failed.", true);
+          } finally {
+            setLoading(false);
+          }
+        });
+
+        loadData();
+      })();
+    </script>
+  </body>
+</html>
