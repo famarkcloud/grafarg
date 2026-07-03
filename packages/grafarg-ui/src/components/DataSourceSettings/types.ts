@@ -14,4 +14,6 @@ export interface HttpSettingsProps extends HttpSettingsBaseProps {
   showAccessOptions?: boolean;
   /** Show the SigV4 auth toggle option */
   sigV4AuthToggleEnabled?: boolean;
+  /** Hide the HTTP heading and URL row (use when the caller renders its own URL/Domain fields) */
+  hideHttpSection?: boolean;
 }

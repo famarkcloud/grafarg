@@ -1,8 +1,6 @@
 import { JSONPath, JSONPathOptions } from 'jsonpath-plus';
 
 export function jp(options: JSONPathOptions): any {
-  return JSONPath({
-    ...options,
-    preventEval: true,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return JSONPath({ ...options } as any);
 }

@@ -46,8 +46,8 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
     trackRequest(request);
 
     const promises = await request.targets
-      .filter((query) => !query.hide)
-      .flatMap((query) => this.doRequest(query, request.range, request.scopedVars));
+      .filter((query: JsonApiQuery) => !query.hide)
+      .flatMap((query: JsonApiQuery) => this.doRequest(query, request.range, request.scopedVars));
 
     const res: DataFrame[][] = await Promise.all(promises);
 
@@ -103,17 +103,18 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
           message: response.statusText ? response.statusText : defaultErrorMessage,
         };
       }
-    } catch (err: any) {
-      if (_.isString(err)) {
+    } catch (err) {
+      const e = err as any;
+      if (_.isString(e)) {
         return {
           status: 'error',
-          message: err,
+          message: e,
         };
       } else {
         let message = 'Famark JSON API: ';
-        message += err.statusText ? err.statusText : defaultErrorMessage;
-        if (err.data && err.data.error && err.data.error.code) {
-          message += ': ' + err.data.error.code + '. ' + err.data.error.message;
+        message += e.statusText ? e.statusText : defaultErrorMessage;
+        if (e.data && e.data.error && e.data.error.code) {
+          message += ': ' + e.data.error.code + '. ' + e.data.error.message;
         }
 
         return {
@@ -248,11 +249,9 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
   }
 }
 
-const replace =
-  (scopedVars?: any, range?: TimeRange) =>
-  (str: string): string => {
-    return replaceMacros(getTemplateSrv().replace(str, scopedVars), range);
-  };
+const replace = (scopedVars?: any, range?: TimeRange) => (str: string): string => {
+  return replaceMacros(getTemplateSrv().replace(str, scopedVars), range);
+};
 
 // replaceMacros substitutes all available macros with their current value.
 export const replaceMacros = (str: string, range?: TimeRange) => {

@@ -15,7 +15,7 @@ export const parseValues = (values: any[], type: FieldType): any[] => {
       }
 
       if (values.filter((_) => _).every((value) => typeof value === 'number')) {
-        const ms = 1_000_000_000_000;
+        const ms = 1000000000000;
 
         // If there are no "big" numbers, assume seconds.
         if (values.filter((_) => _).every((_) => _ < ms)) {

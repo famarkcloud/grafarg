@@ -56,7 +56,7 @@ const HttpAccessHelp = () => (
 );
 
 export const DataSourceHttpSettings: React.FC<HttpSettingsProps> = (props) => {
-  const { defaultUrl, dataSourceConfig, onChange, showAccessOptions, sigV4AuthToggleEnabled } = props;
+  const { defaultUrl, dataSourceConfig, onChange, showAccessOptions, sigV4AuthToggleEnabled, hideHttpSection } = props;
   let urlTooltip;
   const [isAccessHelpVisible, setIsAccessHelpVisible] = useState(false);
   const theme = useTheme();
@@ -121,50 +121,52 @@ export const DataSourceHttpSettings: React.FC<HttpSettingsProps> = (props) => {
 
   return (
     <div className="gf-form-group">
-      <>
-        <h3 className="page-heading">HTTP</h3>
-        <div className="gf-form-group">
-          <div className="gf-form">
-            <FormField label="URL" labelWidth={11} tooltip={urlTooltip} inputEl={urlInput} />
-          </div>
-
-          {showAccessOptions && (
-            <>
-              <div className="gf-form-inline">
-                <div className="gf-form">
-                  <FormField label="Access" labelWidth={11} inputWidth={20} inputEl={accessSelect} />
-                </div>
-                <div className="gf-form">
-                  <label
-                    className="gf-form-label query-keyword pointer"
-                    onClick={() => setIsAccessHelpVisible((isVisible) => !isVisible)}
-                  >
-                    Help&nbsp;
-                    <Icon name={isAccessHelpVisible ? 'angle-down' : 'angle-right'} style={{ marginBottom: 0 }} />
-                  </label>
-                </div>
-              </div>
-              {isAccessHelpVisible && <HttpAccessHelp />}
-            </>
-          )}
-          {dataSourceConfig.access === 'proxy' && (
+      {!hideHttpSection && (
+        <>
+          <h3 className="page-heading">HTTP</h3>
+          <div className="gf-form-group">
             <div className="gf-form">
-              <InlineFormLabel
-                width={11}
-                tooltip="Grafarg Proxy deletes forwarded cookies by default. Specify cookies by name that should be forwarded to the data source."
-              >
-                Whitelisted Cookies
-              </InlineFormLabel>
-              <TagsInput
-                tags={dataSourceConfig.jsonData.keepCookies}
-                onChange={(cookies) =>
-                  onSettingsChange({ jsonData: { ...dataSourceConfig.jsonData, keepCookies: cookies } })
-                }
-              />
+              <FormField label="URL" labelWidth={11} tooltip={urlTooltip} inputEl={urlInput} />
             </div>
-          )}
-        </div>
-      </>
+
+            {showAccessOptions && (
+              <>
+                <div className="gf-form-inline">
+                  <div className="gf-form">
+                    <FormField label="Access" labelWidth={11} inputWidth={20} inputEl={accessSelect} />
+                  </div>
+                  <div className="gf-form">
+                    <label
+                      className="gf-form-label query-keyword pointer"
+                      onClick={() => setIsAccessHelpVisible((isVisible) => !isVisible)}
+                    >
+                      Help&nbsp;
+                      <Icon name={isAccessHelpVisible ? 'angle-down' : 'angle-right'} style={{ marginBottom: 0 }} />
+                    </label>
+                  </div>
+                </div>
+                {isAccessHelpVisible && <HttpAccessHelp />}
+              </>
+            )}
+            {dataSourceConfig.access === 'proxy' && (
+              <div className="gf-form">
+                <InlineFormLabel
+                  width={11}
+                  tooltip="Grafarg Proxy deletes forwarded cookies by default. Specify cookies by name that should be forwarded to the data source."
+                >
+                  Whitelisted Cookies
+                </InlineFormLabel>
+                <TagsInput
+                  tags={dataSourceConfig.jsonData.keepCookies}
+                  onChange={(cookies) =>
+                    onSettingsChange({ jsonData: { ...dataSourceConfig.jsonData, keepCookies: cookies } })
+                  }
+                />
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       <>
         <h3 className="page-heading">Auth</h3>

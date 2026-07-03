@@ -1,38 +1,113 @@
 import { DataSourcePluginOptionsEditorProps } from '@grafarg/data';
 import { DataSourceHttpSettings, InlineField, InlineFieldRow, Input } from '@grafarg/ui';
-import React, { ChangeEvent } from 'react';
+import React, { ChangeEvent, useEffect } from 'react';
 import { JsonApiDataSourceOptions } from '../types';
 
 type Props = DataSourcePluginOptionsEditorProps<JsonApiDataSourceOptions>;
 
-/**
- * ConfigEditor lets the user configure connection details like the URL or
- * authentication.
- */
+/** ConfigEditor lets the user configure connection details like the URL or authentication. */
 export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
-  const onParamsChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const baseUrl = options.jsonData.baseUrl ?? 'http://famark.com/host/api.svc';
+  const domainName = options.jsonData.domainName ?? '';
+  const combinedUrl = (base: string, domain: string) => (base.endsWith('/') ? base : base + '/') + domain;
+
+  // Keep Forward OAuth Identity always enabled.
+  useEffect(() => {
+    if (!options.jsonData.oauthPassThru) {
+      onOptionsChange({ ...options, jsonData: { ...options.jsonData, oauthPassThru: true } });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onBaseUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const newBase = e.currentTarget.value;
     onOptionsChange({
       ...options,
-      jsonData: {
-        ...options.jsonData,
-        queryParams: e.currentTarget.value,
-      },
+      url: combinedUrl(newBase, domainName),
+      jsonData: { ...options.jsonData, baseUrl: newBase, oauthPassThru: true },
     });
   };
 
+  const onDomainNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const newDomain = e.currentTarget.value;
+    onOptionsChange({
+      ...options,
+      url: combinedUrl(baseUrl, newDomain),
+      jsonData: { ...options.jsonData, domainName: newDomain, oauthPassThru: true },
+    });
+  };
+
+  const onParamsChange = (e: ChangeEvent<HTMLInputElement>) => {
+    onOptionsChange({
+      ...options,
+      jsonData: { ...options.jsonData, queryParams: e.currentTarget.value },
+    });
+  };
+
+  const combined = combinedUrl(baseUrl, domainName);
+
   return (
     <>
-      {/* DataSourceHttpSettings handles most the settings for connecting over
-      HTTP. */}
+      <h3 className="page-heading">HTTP</h3>
+      <div className="gf-form-group">
+        <div className="gf-form">
+          <InlineFieldRow>
+            <InlineField label="URL" labelWidth={16} tooltip="Base API URL, e.g. http://famark.com/host/api.svc">
+              <Input
+                width={40}
+                value={baseUrl}
+                onChange={onBaseUrlChange}
+                placeholder="http://famark.com/host/api.svc"
+              />
+            </InlineField>
+          </InlineFieldRow>
+        </div>
+        <div className="gf-form">
+          <InlineFieldRow>
+            <InlineField
+              label="Domain Name"
+              labelWidth={16}
+              tooltip="Tenant/domain name appended to the base URL, e.g. MyDomain"
+            >
+              <Input width={40} value={domainName} onChange={onDomainNameChange} placeholder="MyDomain" />
+            </InlineField>
+          </InlineFieldRow>
+        </div>
+        <div className="gf-form">
+          <InlineFieldRow>
+            <InlineField
+              label="Combined URL"
+              labelWidth={16}
+              tooltip="The full URL sent to the API (Base URL + Domain)"
+            >
+              <Input width={40} value={combined} readOnly />
+            </InlineField>
+          </InlineFieldRow>
+        </div>
+      </div>
+
       <DataSourceHttpSettings
-        defaultUrl="http://localhost:8080"
-        dataSourceConfig={options}
-        onChange={onOptionsChange}
+        defaultUrl="http://famark.com/host/api.svc"
+        hideHttpSection={true}
+        dataSourceConfig={{
+          ...options,
+          url: combined,
+          jsonData: { ...options.jsonData, oauthPassThru: true },
+        }}
+        onChange={(newOpts) => {
+          const jd = newOpts.jsonData as JsonApiDataSourceOptions;
+          onOptionsChange({
+            ...newOpts,
+            url: combinedUrl(jd.baseUrl ?? baseUrl, jd.domainName ?? domainName),
+            jsonData: {
+              ...jd,
+              baseUrl: jd.baseUrl ?? baseUrl,
+              domainName: jd.domainName ?? domainName,
+              oauthPassThru: true,
+            },
+          });
+        }}
       />
 
-      {/* The Grafarg proxy strips query parameters from the URL set in
-      DataSourceHttpSettings. To support custom query parameters, the user need
-      to set them explicitly.  */}
       <h3 className="page-heading">Misc</h3>
       <InlineFieldRow>
         <InlineField label="Query string" tooltip="Add a custom query string to your queries.">

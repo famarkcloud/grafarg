@@ -12,6 +12,7 @@ export interface JsonField {
 export type Pair<T, K> = [T, K];
 
 export interface JsonApiQuery extends DataQuery {
+  refId: string;
   fields: JsonField[];
   method: string;
   urlPath: string;
@@ -41,4 +42,7 @@ export const defaultQuery: Partial<JsonApiQuery> = {
 
 export interface JsonApiDataSourceOptions extends DataSourceJsonData {
   queryParams?: string;
+  baseUrl?: string;
+  domainName?: string;
+  oauthPassThru?: boolean;
 }
