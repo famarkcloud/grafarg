@@ -1,5 +1,5 @@
 import { DataSourcePluginOptionsEditorProps } from '@grafarg/data';
-import { DataSourceHttpSettings, InlineField, InlineFieldRow, Input } from '@grafarg/ui';
+import { DataSourceHttpSettings, InlineField, InlineFieldRow, InlineFormLabel, Input, TagsInput } from '@grafarg/ui';
 import React, { ChangeEvent, useEffect } from 'react';
 import { JsonApiDataSourceOptions } from '../types';
 
@@ -83,6 +83,22 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
             </InlineField>
           </InlineFieldRow>
         </div>
+        {options.access !== 'direct' && (
+          <div className="gf-form">
+            <InlineFormLabel
+              width={16}
+              tooltip="Grafarg Proxy deletes forwarded cookies by default. Specify cookies by name that should be forwarded to the data source."
+            >
+              Whitelisted Cookies
+            </InlineFormLabel>
+            <TagsInput
+              tags={options.jsonData.keepCookies}
+              onChange={(cookies) =>
+                onOptionsChange({ ...options, jsonData: { ...options.jsonData, keepCookies: cookies } })
+              }
+            />
+          </div>
+        )}
       </div>
 
       <DataSourceHttpSettings

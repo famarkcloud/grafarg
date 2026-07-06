@@ -45,4 +45,5 @@ export interface JsonApiDataSourceOptions extends DataSourceJsonData {
   baseUrl?: string;
   domainName?: string;
   oauthPassThru?: boolean;
+  keepCookies?: string[];
 }

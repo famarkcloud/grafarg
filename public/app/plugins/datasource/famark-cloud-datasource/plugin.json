@@ -12,7 +12,10 @@
       "name": "Grafarg Labs",
       "url": "https://grafarg.com"
     },
-    "keywords": ["json", "api"],
+    "keywords": [
+      "json",
+      "api"
+    ],
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
@@ -32,8 +35,14 @@
       }
     ],
     "screenshots": [
-      { "name": "Explore (Dark)", "path": "img/dark.png" },
-      { "name": "Explore (Light)", "path": "img/light.png" }
+      {
+        "name": "Explore (Dark)",
+        "path": "img/dark.png"
+      },
+      {
+        "name": "Explore (Light)",
+        "path": "img/light.png"
+      }
     ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
@@ -42,5 +51,6 @@
     "grafargDependency": ">=8.5.13",
     "grafargVersion": "8.5.x",
     "plugins": []
-  }
+  },
+  "category": "enterprise"
 }

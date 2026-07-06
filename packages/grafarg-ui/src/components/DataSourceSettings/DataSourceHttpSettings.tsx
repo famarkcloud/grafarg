@@ -148,7 +148,7 @@ export const DataSourceHttpSettings: React.FC<HttpSettingsProps> = (props) => {
                 {isAccessHelpVisible && <HttpAccessHelp />}
               </>
             )}
-            {dataSourceConfig.access === 'proxy' && (
+            {dataSourceConfig.access !== 'direct' && (
               <div className="gf-form">
                 <InlineFormLabel
                   width={11}
