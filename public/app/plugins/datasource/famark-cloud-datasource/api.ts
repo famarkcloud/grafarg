@@ -133,7 +133,7 @@ export default class Api {
     //
     // For example, `/orgs/${orgId}/list` becomes `/orgs/list` instead of
     // `/orgs//list`.
-    req.url = req.url.replace(/[\/]+/g, '/');
+    req.url = req.url.replace(/([^:])\/\/+/g, '$1/');
 
     if (params && Object.keys(params).length > 0) {
       req.url =

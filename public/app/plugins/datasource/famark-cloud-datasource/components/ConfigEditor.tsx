@@ -7,7 +7,7 @@ type Props = DataSourcePluginOptionsEditorProps<JsonApiDataSourceOptions>;
 
 /** ConfigEditor lets the user configure connection details like the URL or authentication. */
 export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
-  const baseUrl = options.jsonData.baseUrl ?? 'http://famark.com/host/api.svc';
+  const baseUrl = options.jsonData.baseUrl ?? 'https://www.famark.com/Host/api.svc/api';
   const domainName = options.jsonData.domainName ?? '';
   const combinedUrl = (base: string, domain: string) => (base.endsWith('/') ? base : base + '/') + domain;
 
@@ -51,12 +51,16 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
       <div className="gf-form-group">
         <div className="gf-form">
           <InlineFieldRow>
-            <InlineField label="URL" labelWidth={16} tooltip="Base API URL, e.g. http://famark.com/host/api.svc">
+            <InlineField
+              label="URL"
+              labelWidth={16}
+              tooltip="Base API URL, e.g. https://www.famark.com/Host/api.svc/api/"
+            >
               <Input
                 width={40}
                 value={baseUrl}
                 onChange={onBaseUrlChange}
-                placeholder="http://famark.com/host/api.svc"
+                placeholder="https://www.famark.com/Host/api.svc/api/"
               />
             </InlineField>
           </InlineFieldRow>
@@ -102,7 +106,7 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
       </div>
 
       <DataSourceHttpSettings
-        defaultUrl="http://famark.com/host/api.svc"
+        defaultUrl="https://www.famark.com/Host/api.svc/api/"
         hideHttpSection={true}
         dataSourceConfig={{
           ...options,

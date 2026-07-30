@@ -138,28 +138,37 @@ export const FieldEditor = ({
     const next = columns.map((col, i) => {
       const existing = value[i];
       const attrName = isStats ? splitColumnIntoAggAndAttribute(col)[1] || col : col;
+      const defaultPath = isStats ? '$.Data[*][*]' : `${prefix}${col}`;
       return {
         name: existing?.name ?? '',
-        jsonPath: isStats ? '$.Data[*][*]' : `${prefix}${col}`,
+        // Preserve user-set path; only use default for new empty fields.
+        jsonPath: existing?.jsonPath || defaultPath,
         language: existing?.language ?? 'jsonpath',
-        type: toFieldType(getAttrType(attrName)),
+        type: existing?.type || toFieldType(getAttrType(attrName)),
       };
     });
 
+    // Preserve any extra fields the user added beyond the column count.
+    const extra = value.slice(columns.length);
+    const merged = [...next, ...extra];
+
     const unchanged =
-      value.length === next.length && value.every((f, i) => f.jsonPath === next[i].jsonPath && f.type === next[i].type);
+      value.length === merged.length &&
+      value.every((f, i) => f.jsonPath === merged[i].jsonPath && f.type === merged[i].type);
 
     if (!unchanged) {
-      onChange(next);
+      onChange(merged);
     }
-  }, [body, isStats, operation, onChange, attributes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body, isStats, operation, attributes]); // onChange excluded: stable ref, prevKey handles change detection
 
   // ── Ensure stats fields have a jsonPath ──
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isStats && value.some((f) => !f.jsonPath)) {
       onChange(value.map((f) => (f.jsonPath ? f : { ...f, jsonPath: '$.Data[*][*]' })));
     }
-  }, [isStats, onChange, value]);
+  }, [isStats, value]); // onChange excluded: stable ref, no need to re-run on ref change
 
   // ── Field update helpers ──
 
