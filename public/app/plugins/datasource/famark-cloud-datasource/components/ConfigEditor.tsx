@@ -1,7 +1,7 @@
-import { DataSourcePluginOptionsEditorProps } from '@grafarg/data';
+import { AppEvents, DataSourcePluginOptionsEditorProps } from '@grafarg/data';
+import { getBackendSrv } from '@grafarg/runtime';
 import Api from '../api';
 import {
-  Alert,
   FieldValidationMessage,
   Button,
   DataSourceHttpSettings,
@@ -14,6 +14,7 @@ import {
 } from '@grafarg/ui';
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import { JsonApiDataSourceOptions } from '../types';
+import appEvents from 'app/core/app_events';
 
 type Props = DataSourcePluginOptionsEditorProps<JsonApiDataSourceOptions>;
 
@@ -23,25 +24,41 @@ const AUTH_MODE_OPTIONS = [
   { label: 'User / Password', value: 'userpass' },
 ];
 
+const DEFAULT_BASE_URL = 'https://www.famark.com/Host/api.svc/';
+
 /** ConfigEditor lets the user configure connection details like the URL or authentication. */
 export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
-  const baseUrl = options.jsonData.baseUrl ?? 'https://www.famark.com/Host/api.svc/api';
+  const baseUrl = options.jsonData.baseUrl ?? DEFAULT_BASE_URL;
   const domainName = options.jsonData.domainName ?? '';
-  const combinedUrl = (base: string, domain: string) => (base.endsWith('/') ? base : base + '/') + domain;
+  const combinedUrl = (base: string, domain: string) => {
+    const cleanBase = base.endsWith('/') ? base : base + '/';
+    return domain ? cleanBase + domain : cleanBase;
+  };
 
   const [authMode, setAuthMode] = useState<'oauth' | 'userpass'>(
     ((options.jsonData as any).authMode ?? 'oauth') as 'oauth' | 'userpass'
   );
   const [credUsername, setCredUsername] = useState<string>(((options.jsonData as any).credUsername ?? '') as string);
   const [credPassword, setCredPassword] = useState('');
-  const [credStatus, setCredStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [credStatus, setCredStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [credError, setCredError] = useState('');
+  const [setCount, setSetCount] = useState(0);
 
   useEffect(() => {
     const savedMode = ((options.jsonData as any).authMode ?? 'oauth') as string;
     const expected = savedMode === 'oauth';
-    if (options.jsonData.oauthPassThru !== expected) {
-      onOptionsChange({ ...options, jsonData: { ...options.jsonData, oauthPassThru: expected } });
+    const currentCombined = options.url || combinedUrl(baseUrl, domainName);
+    if (options.jsonData.oauthPassThru !== expected || !options.url || !options.jsonData.baseUrl) {
+      onOptionsChange({
+        ...options,
+        url: currentCombined,
+        jsonData: {
+          ...options.jsonData,
+          baseUrl: options.jsonData.baseUrl ?? baseUrl,
+          domainName: options.jsonData.domainName ?? domainName,
+          oauthPassThru: expected,
+        },
+      });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -81,11 +98,48 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
   };
 
   const onConnectWithUserPass = async () => {
+    const missing = [!domainName && 'Domain Name', !credUsername && 'Username', !credPassword && 'Password'].filter(
+      Boolean
+    );
+    if (missing.length) {
+      setCredError(`${missing.join(missing.length === 2 ? ' and ' : ', ')} required`);
+      setCredStatus('error');
+      return;
+    }
     setCredStatus('loading');
     setCredError('');
     try {
+      // Always fetch the latest datasource from server to get current version.
+      // This prevents 409 "already updated" conflicts when user edits fields
+      // (domain, URL, username, etc.) between Set clicks.
+      let latestVersion = options.version;
+      if (options.id) {
+        const current = await getBackendSrv().get(`/api/datasources/${options.id}`);
+        latestVersion = current.version;
+      }
+
+      // Step 1: save current URL to DB so proxy knows where to forward
+      const opts: any = {
+        ...options,
+        version: latestVersion,
+        url: combinedUrl(baseUrl, domainName),
+        jsonData: {
+          ...options.jsonData,
+          baseUrl,
+          domainName,
+          oauthPassThru: false,
+          authMode: 'userpass',
+          credUsername,
+        },
+      };
+      if (options.id) {
+        const saved = await getBackendSrv().put(`/api/datasources/${options.id}`, opts);
+        opts.version = saved?.datasource?.version ?? opts.version;
+      }
+
+      // Step 2: call /Credential/Connect through the proxy (URL is now in the DB)
       const body = JSON.stringify({ DomainName: domainName, UserName: credUsername, Password: credPassword });
-      const sessionId: string = await new Api(baseUrl, '').get(
+      const sessionId: string = await new Api('/api/datasources/proxy/' + options.id, '').get(
         'POST',
         '/Credential/Connect',
         [],
@@ -93,22 +147,39 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
         body,
         { hideFromInspector: true }
       );
-      onOptionsChange({
-        ...options,
-        jsonData: { ...options.jsonData, oauthPassThru: false, httpHeaderName1: 'SessionId' } as any,
+
+      // Step 3: save the SessionId header - use updated version so no 409
+      const final: any = {
+        ...opts,
+        jsonData: { ...opts.jsonData, httpHeaderName1: 'SessionId' } as any,
         secureJsonData: { httpHeaderValue1: sessionId } as any,
-        secureJsonFields: { ...options.secureJsonFields, httpHeaderValue1: true },
-      });
-      setCredStatus('success');
+        secureJsonFields: { ...opts.secureJsonFields, httpHeaderValue1: true },
+      };
+      if (options.id) {
+        const saved2 = await getBackendSrv().put(`/api/datasources/${options.id}`, final);
+        final.version = saved2?.datasource?.version ?? final.version;
+      }
+      onOptionsChange(final);
+      setCredStatus('idle');
+      setSetCount((c) => c + 1);
+      appEvents.emit(AppEvents.alertSuccess, ['SessionId set successfully']);
     } catch (err) {
-      const apiMsg = (err as any)?.data?.ErrorMessage;
-      setCredError(apiMsg ?? (err as any)?.message ?? 'Connection failed');
+      // Even on error, sync the version from server so next attempt won't 409
+      if (options.id) {
+        try {
+          const current = await getBackendSrv().get(`/api/datasources/${options.id}`);
+          onOptionsChange({ ...options, version: current.version });
+        } catch (_) {
+          // ignore version sync failure
+        }
+      }
+      setCredError((err as any)?.data?.ErrorMessage ?? (err as any)?.message ?? 'Connection failed');
       setCredStatus('error');
     }
   };
 
   const combined = combinedUrl(baseUrl, domainName);
-  const httpHeaderKey = (options.jsonData as any).httpHeaderName1 ?? 'none';
+  const httpHeaderKey = `${(options.jsonData as any).httpHeaderName1 ?? 'none'}-${setCount}`;
 
   return (
     <>
@@ -116,16 +187,12 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
       <div className="gf-form-group">
         <div className="gf-form">
           <InlineFieldRow>
-            <InlineField
-              label="URL"
-              labelWidth={16}
-              tooltip="Base API URL, e.g. https://www.famark.com/Host/api.svc/api/"
-            >
+            <InlineField label="URL" labelWidth={16} tooltip="Base API URL, e.g. https://www.famark.com/Host/api.svc/">
               <Input
                 width={40}
                 value={baseUrl}
                 onChange={onBaseUrlChange}
-                placeholder="https://www.famark.com/Host/api.svc/api/"
+                placeholder="https://www.famark.com/Host/api.svc/"
               />
             </InlineField>
           </InlineFieldRow>
@@ -218,16 +285,10 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
               </InlineField>
             </div>
             <div className="gf-form">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={onConnectWithUserPass}
-                disabled={credStatus === 'loading' || !credUsername || !credPassword}
-              >
+              <Button variant="primary" size="sm" onClick={onConnectWithUserPass} disabled={credStatus === 'loading'}>
                 {credStatus === 'loading' ? 'Connecting...' : 'Set'}
               </Button>
             </div>
-            {credStatus === 'success' && <Alert severity="success" title="SessionId set successfully" />}
             {credStatus === 'error' && <FieldValidationMessage>{credError}</FieldValidationMessage>}
           </>
         )}
@@ -235,7 +296,7 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
 
       <DataSourceHttpSettings
         key={httpHeaderKey}
-        defaultUrl="https://www.famark.com/Host/api.svc/api/"
+        defaultUrl={DEFAULT_BASE_URL}
         hideHttpSection={true}
         dataSourceConfig={{
           ...options,
