@@ -27,16 +27,12 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
 
   constructor(instanceSettings: DataSourceInstanceSettings<JsonApiDataSourceOptions>) {
     super(instanceSettings);
-
     this.api = new API(instanceSettings.url!, instanceSettings.jsonData.queryParams || '');
   }
 
   /**
    * metadataRequest is used by the language provider to return the JSON
    * document to generate suggestions for the QueryField.
-   *
-   * This is a custom method and is not part of the DataSourceApi, feel free to
-   * name it as you like.
    */
   async metadataRequest(query: JsonApiQuery, range?: TimeRange) {
     return this.requestJson(query, replace({}, range));
@@ -51,14 +47,11 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
 
     const res: DataFrame[][] = await Promise.all(promises);
 
-    // Wait for all queries to finish before returning the result.
     return { data: res.flatMap((frames) => frames) };
   }
 
   /**
    * Returns values for a Query variable.
-   *
-   * @param query
    */
   async metricFindQuery?(query: JsonApiQuery, options: Record<string, any>): Promise<MetricFindValue[]> {
     const frames = await this.doRequest(query, options.range);
@@ -143,7 +136,6 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
 
             const bindings: Record<string, any> = {};
 
-            // Bind dashboard variables to JSONata variables.
             getTemplateSrv()
               .getVariables()
               .map((v) => ({ name: v.name, value: getVariable(v.name) }))
@@ -151,7 +143,6 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
                 bindings[v.name] = v.value;
               });
 
-            // Bind Global variables to JSONata variables.
             globalVariables
               .map((v) => ({ name: v, value: getVariable(v) }))
               .forEach((v) => {
@@ -166,8 +157,6 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
             }
 
             const result = expression.evaluate(json, bindings);
-
-            // Ensure that we always return an array.
             const arrayResult = Array.isArray(result) ? result : [result];
 
             return {
@@ -180,11 +169,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
             const path = replaceWithVars(field.jsonPath);
             const values = jp({ path, json });
 
-            // Get the path for automatic setting of the field name.
-            //
-            // Casted to any due to typing issues with JSONPath-Plus
             const paths = (JSONPath as any).toPathArray(path);
-
             const propertyType = field.type ? field.type : detectFieldType(values);
             const typedValues = parseValues(values, propertyType);
 
@@ -200,7 +185,6 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
     const fieldLengths = fields.map((field) => field.values.length);
     const uniqueFieldLengths = Array.from(new Set(fieldLengths)).length;
 
-    // All fields need to have the same length for the data frame to be valid.
     if (uniqueFieldLengths > 1) {
       throw new Error('Fields have different lengths');
     }
@@ -238,6 +222,10 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       return [interpolate(key), interpolate(value)];
     };
 
+    // All auth modes (OAuth Forwarding, User/Password, Service Account) now work
+    // through the Grafarg proxy. The SessionId header is stored as a custom HTTP
+    // header (httpHeaderName1/httpHeaderValue1) and injected automatically by the
+    // proxy transport layer. No client-side header injection needed.
     return await this.api.cachedGet(
       query.cacheDurationSeconds,
       query.method,
@@ -253,14 +241,13 @@ const replace = (scopedVars?: any, range?: TimeRange) => (str: string): string =
   return replaceMacros(getTemplateSrv().replace(str, scopedVars), range);
 };
 
-// replaceMacros substitutes all available macros with their current value.
 export const replaceMacros = (str: string, range?: TimeRange) => {
   return range
     ? str
-        .replace(/\$__unixEpochFrom\(\)/g, range.from.unix().toString())
-        .replace(/\$__unixEpochTo\(\)/g, range.to.unix().toString())
-        .replace(/\$__isoFrom\(\)/g, range.from.toISOString())
-        .replace(/\$__isoTo\(\)/g, range.to.toISOString())
+        .replace(/\(\)/g, range.from.unix().toString())
+        .replace(/\(\)/g, range.to.unix().toString())
+        .replace(/\(\)/g, range.from.toISOString())
+        .replace(/\(\)/g, range.to.toISOString())
     : str;
 };
 
@@ -274,7 +261,6 @@ export const groupBy = (frame: DataFrame, fieldName: string): DataFrame[] => {
 
   const frames = [...uniqueValues].map((groupByValue) => {
     const fields: Field[] = frame.fields
-      // Skip the field we're grouping on.
       .filter((field) => field.name.toString() !== groupByField.name)
       .map((field) => ({
         ...field,
@@ -295,19 +281,15 @@ export const groupBy = (frame: DataFrame, fieldName: string): DataFrame[] => {
   return frames;
 };
 
-// Helper function to extract the values of a variable instead of interpolating it.
 const getVariable = (name: any): string[] => {
   const values: string[] = [];
 
-  // Instead of interpolating the string, we collect the values in an array.
   getTemplateSrv().replace(`$${name}`, {}, (value: string | string[]) => {
     if (Array.isArray(value)) {
       values.push(...value);
     } else {
       values.push(value);
     }
-
-    // We don't really care about the string here.
     return '';
   });
 
