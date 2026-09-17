@@ -74,7 +74,7 @@ func GetCurrentOAuthToken(ctx context.Context, user *models.SignedInUser) *oauth
 		}
 		logger.Debug("updated OAuth info for user", "userId", user.UserId, "username", user.Login)
 	}
-	return token
+	return token.WithExtra(map[string]interface{}{"provider": authProvider})
 }
 
 // IsOAuthPassThruEnabled returns true if Forward OAuth Identity (oauthPassThru) is enabled for the provided data source.

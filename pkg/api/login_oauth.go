@@ -85,9 +85,9 @@ func (hs *HTTPServer) OAuthLogin(ctx *models.ReqContext) {
 		callbackPath := setting.AppSubUrl + "/public/oauth-callback.html"
 		cookies.WriteCookie(ctx.Resp, "redirect_to", url.QueryEscape(callbackPath), 0, hs.CookieOptionsFromCfg)
 		if setting.OAuthService.OAuthInfos[name].HostedDomain == "" {
-			ctx.Redirect(connect.AuthCodeURL(state, oauth2.AccessTypeOnline))
+			ctx.Redirect(connect.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent")))
 		} else {
-			ctx.Redirect(connect.AuthCodeURL(state, oauth2.SetAuthURLParam("hd", setting.OAuthService.OAuthInfos[name].HostedDomain), oauth2.AccessTypeOnline))
+			ctx.Redirect(connect.AuthCodeURL(state, oauth2.SetAuthURLParam("hd", setting.OAuthService.OAuthInfos[name].HostedDomain), oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent")))
 		}
 		return
 	}

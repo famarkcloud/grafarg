@@ -238,6 +238,14 @@ func (proxy *DataSourceProxy) director(req *http.Request) {
 	if oauthtoken.IsOAuthPassThruEnabled(proxy.ds) {
 		if token := oauthtoken.GetCurrentOAuthToken(proxy.ctx.Req.Context(), proxy.ctx.SignedInUser); token != nil {
 			req.Header.Set("Authorization", fmt.Sprintf("%s %s", token.Type(), token.AccessToken))
+
+			provider, _ := token.Extra("provider").(string)
+			sec := "auth." + strings.TrimPrefix(strings.ToLower(provider), "oauth_")
+			if idp := setting.Raw.Section(sec).Key("identity_provider").MustString(""); idp != "" {
+				q := req.URL.Query()
+				q.Set("$IdentityProvider", idp)
+				req.URL.RawQuery = q.Encode()
+			}
 		}
 	}
 }
