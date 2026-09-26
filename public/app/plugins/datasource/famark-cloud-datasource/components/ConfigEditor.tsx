@@ -10,7 +10,6 @@ import {
   InlineFormLabel,
   Input,
   RadioButtonGroup,
-  TagsInput,
 } from '@grafarg/ui';
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import { JsonApiDataSourceOptions } from '../types';
@@ -22,26 +21,37 @@ type Props = DataSourcePluginOptionsEditorProps<JsonApiDataSourceOptions>;
 const AUTH_MODE_OPTIONS = [
   { label: 'OAuth Forwarding', value: 'oauth' },
   { label: 'User / Password', value: 'userpass' },
-  { label: 'Service Account', value: 'serviceaccount' },
 ];
 
 const DEFAULT_BASE_URL = 'https://www.famark.com/Host/api.svc/';
 
-/** Combine base URL + domain into a single URL */
-const combinedUrl = (base: string, domain: string) => {
-  const cleanBase = base.endsWith('/') ? base : base + '/';
-  return domain ? cleanBase + domain : cleanBase;
+// Extract domain from URL (segment after api.svc or last path segment)
+const extractDomainFromUrl = (url?: string): string => {
+  const clean = (url || '')
+    .trim()
+    .replace(/[?#].*$/, '')
+    .replace(/\/+$/, '');
+  const last = clean.split('/').pop() || '';
+  return last.toLowerCase().endsWith('.svc') || clean.split('/').length <= 3 ? '' : last;
+};
+
+// Update or append domain at the end of the URL
+const updateUrlWithDomain = (currentUrl: string | undefined, newDomain: string): string => {
+  const base = (currentUrl?.trim() || DEFAULT_BASE_URL).replace(/[?#].*$/, '').replace(/\/+$/, '');
+  const cleanBase = extractDomainFromUrl(base) ? base.slice(0, base.lastIndexOf('/')) : base;
+  const domain = newDomain.trim().replace(/^\/+|\/+$/g, '');
+  return domain ? `${cleanBase}/${domain}` : `${cleanBase}/`;
 };
 
 /** ConfigEditor lets the user configure connection details like the URL or authentication. */
 export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
-  const baseUrl = options.jsonData.baseUrl ?? DEFAULT_BASE_URL;
-  const domainName = options.jsonData.domainName ?? '';
-
   // Auth mode
-  const [authMode, setAuthMode] = useState<'oauth' | 'userpass' | 'serviceaccount'>(
-    ((options.jsonData as any).authMode ?? 'oauth') as 'oauth' | 'userpass' | 'serviceaccount'
+  const [authMode, setAuthMode] = useState<'oauth' | 'userpass'>(
+    ((options.jsonData as any).authMode ?? 'oauth') as 'oauth' | 'userpass'
   );
+
+  // Domain Name (synced with URL ending)
+  const domainName = options.jsonData.domainName ?? extractDomainFromUrl(options.url);
 
   // User / Password state
   const [credUsername, setCredUsername] = useState<string>(((options.jsonData as any).credUsername ?? '') as string);
@@ -54,58 +64,37 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
   const [modeSwitchStatus, setModeSwitchStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [modeSwitchError, setModeSwitchError] = useState('');
 
-  // Service Account state
-  const [saTokenUrl, setSaTokenUrl] = useState<string>(((options.jsonData as any).saTokenUrl ?? '') as string);
-  const [saClientId, setSaClientId] = useState<string>(((options.jsonData as any).saClientId ?? '') as string);
-  const [saClientSecret, setSaClientSecret] = useState('');
-  const [saAudience, setSaAudience] = useState<string>(
-    ((options.jsonData as any).saAudience ?? 'http://localhost:3000') as string
-  );
-  const [saStatus, setSaStatus] = useState<'idle' | 'saving' | 'error'>('idle');
-  const [saError, setSaError] = useState('');
-
-  // On mount: ensure URL + baseUrl are initialised, and default oauthPassThru
-  // to true when authMode is 'oauth' and oauthPassThru hasn't been set yet.
+  // On mount: default oauthPassThru to true when authMode is 'oauth' and sync domainName if present in URL
   useEffect(() => {
-    const currentCombined = options.url || combinedUrl(baseUrl, domainName);
     const currentAuthMode = (options.jsonData as any).authMode ?? 'oauth';
     const currentOAuthPassThru = (options.jsonData as any).oauthPassThru;
-
-    // Only update if URL/baseUrl needs init OR oauthPassThru needs defaulting
-    const needsUrlInit = !options.url || !options.jsonData.baseUrl;
     const needsOAuthDefault = currentAuthMode === 'oauth' && currentOAuthPassThru === undefined;
 
-    if (needsUrlInit || needsOAuthDefault) {
+    const detectedDomain = extractDomainFromUrl(options.url);
+    const needsDomainSync = !options.jsonData.domainName && detectedDomain;
+
+    if (needsOAuthDefault || needsDomainSync) {
       onOptionsChange({
         ...options,
-        url: currentCombined,
         jsonData: {
           ...options.jsonData,
-          baseUrl: options.jsonData.baseUrl ?? baseUrl,
-          domainName: options.jsonData.domainName ?? domainName,
-          // Default oauthPassThru to true for oauth mode if not already set
           ...(needsOAuthDefault ? { oauthPassThru: true } : {}),
+          ...(needsDomainSync ? { domainName: detectedDomain } : {}),
         },
       });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // URL change handlers — never touch oauthPassThru
-  const onBaseUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newBase = e.currentTarget.value;
+  // When Domain Name input changes: update domainName in jsonData and update ending of URL
+  const onDomainChange = (newDomain: string) => {
+    const newUrl = updateUrlWithDomain(options.url, newDomain);
     onOptionsChange({
       ...options,
-      url: combinedUrl(newBase, domainName),
-      jsonData: { ...options.jsonData, baseUrl: newBase },
-    });
-  };
-
-  const onDomainNameChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newDomain = e.currentTarget.value;
-    onOptionsChange({
-      ...options,
-      url: combinedUrl(baseUrl, newDomain),
-      jsonData: { ...options.jsonData, domainName: newDomain },
+      url: newUrl,
+      jsonData: {
+        ...options.jsonData,
+        domainName: newDomain,
+      },
     });
   };
 
@@ -129,44 +118,39 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
     }
   };
 
+  // Helper: silently PUT to /api/datasources without triggering Grafana's "Datasource updated" toast
+  const silentPut = async (url: string, data: any) => {
+    return await getBackendSrv().request({
+      method: 'PUT',
+      url,
+      data,
+      showSuccessAlert: false,
+    });
+  };
+
   // Auth mode change.
-  // When leaving userpass we MUST remove the SessionId header from the DB so the proxy
-  // stops injecting it. We do a real PUT here and surface errors to the user.
-  const onAuthModeChange = async (mode: 'oauth' | 'userpass' | 'serviceaccount') => {
+  // When leaving userpass we clear the injected custom header.
+  const onAuthModeChange = async (mode: 'oauth' | 'userpass') => {
     setAuthMode(mode);
     setCredStatus('idle');
     setCredError('');
-    setSaStatus('idle');
-    setSaError('');
     setModeSwitchStatus('idle');
     setModeSwitchError('');
 
-    // We need to clear the custom header when leaving userpass OR serviceaccount,
-    // because both modes store a token in httpHeaderValue1.
     const leavingUserPass = authMode === 'userpass' && mode !== 'userpass';
-    const leavingServiceAccount = authMode === 'serviceaccount' && mode !== 'serviceaccount';
-    const leavingTokenMode = leavingUserPass || leavingServiceAccount;
 
-    // Build updated jsonData.
-    // KEY: when leaving userpass/serviceaccount we delete httpHeaderName1 so the Grafarg proxy
-    // no longer injects the old header — even if the encrypted value is still in DB.
     const updatedJsonData: any = {
       ...options.jsonData,
       authMode: mode,
-      saTokenUrl: mode === 'serviceaccount' ? saTokenUrl : '',
-      // Default the oauthPassThru toggle based on the selected mode:
-      // Enable it for 'oauth' mode, disable for others. The user can still toggle it manually later.
       oauthPassThru: mode === 'oauth' ? true : false,
     };
-    if (leavingTokenMode) {
+    if (leavingUserPass) {
       delete updatedJsonData.httpHeaderName1;
       delete updatedJsonData.credUsername;
     }
 
-    // When leaving userpass/serviceaccount: mark secure fields as gone so the UI shows them cleared.
-    // The backend will only truly delete them if we persist with a PUT below.
     const updatedSecureJsonFields: any = { ...options.secureJsonFields };
-    if (leavingTokenMode) {
+    if (leavingUserPass) {
       updatedSecureJsonFields.httpHeaderValue1 = false;
       updatedSecureJsonFields.password = false;
       updatedSecureJsonFields.credPassword = false;
@@ -176,10 +160,7 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
       ...options,
       jsonData: updatedJsonData,
       secureJsonFields: updatedSecureJsonFields,
-      // Sending a placeholder value for the secrets tells the backend to overwrite them.
-      // We use a single space so Grafana stores an effectively empty/invalid value,
-      // while still triggering an update on the encrypted field.
-      ...(leavingTokenMode
+      ...(leavingUserPass
         ? {
             secureJsonData: {
               ...(options.secureJsonData ?? {}),
@@ -194,28 +175,25 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
     onOptionsChange(updated);
 
     // Persist to DB so the Grafarg proxy stops sending the old header.
-    if (options.id && leavingTokenMode) {
+    if (options.id && leavingUserPass) {
       setModeSwitchStatus('saving');
       try {
         const latestVersion = await fetchLatestVersion();
-        const saved = await getBackendSrv().put(`/api/datasources/${options.id}`, {
+        const saved = await silentPut(`/api/datasources/${options.id}`, {
           ...updated,
           version: latestVersion,
         });
-        // Sync version so subsequent saves don't get a 409
         onOptionsChange({
           ...updated,
           version: saved?.datasource?.version ?? latestVersion,
           secureJsonFields: saved?.datasource?.secureJsonFields ?? updatedSecureJsonFields,
         });
         setModeSwitchStatus('idle');
-        appEvents.emit(AppEvents.alertSuccess, ['Auth mode switched. Session cleared.']);
       } catch (err) {
         const msg =
-          (err as any)?.data?.message ?? (err as any)?.message ?? 'Failed to save — please click Save & Test manually';
+          (err as any)?.data?.message ?? (err as any)?.message ?? 'Failed to save - please click Save & Test manually';
         setModeSwitchStatus('error');
         setModeSwitchError(msg);
-        // Try to refresh the version so manual Save & Test can still succeed
         try {
           const current = await getBackendSrv().get(`/api/datasources/${options.id}`);
           onOptionsChange({ ...updated, version: current.version });
@@ -226,15 +204,20 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
 
   // User / Password: Connect with username + password, get SessionId, store as custom HTTP header
   const onConnectWithUserPass = async () => {
+    const currentDomain = domainName || extractDomainFromUrl(options.url);
     const hasSavedSecret = Boolean(
       options.secureJsonFields?.password ||
         options.secureJsonFields?.credPassword ||
         options.secureJsonFields?.httpHeaderValue1
     );
     const needPassword = !credPassword && !hasSavedSecret;
-    const missing = [!domainName && 'Domain Name', !credUsername && 'Username', needPassword && 'Password'].filter(
-      Boolean
-    );
+    const missing = [
+      !options.url && 'URL',
+      !currentDomain && 'Domain Name',
+      !credUsername && 'Username',
+      needPassword && 'Password',
+    ].filter(Boolean);
+
     if (missing.length) {
       setCredError(`${missing.join(missing.length === 2 ? ' and ' : ', ')} required`);
       setCredStatus('error');
@@ -245,30 +228,26 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
     try {
       const latestVersion = await fetchLatestVersion();
 
-      // Step 1: save current URL + jsonData to DB so proxy knows where to forward
+      // Step 1: save current options so proxy knows where to forward
       const opts: any = {
         ...options,
         version: latestVersion,
-        url: combinedUrl(baseUrl, domainName),
         jsonData: {
           ...options.jsonData,
-          baseUrl,
-          domainName,
-          // Do NOT touch oauthPassThru
+          domainName: currentDomain,
           authMode: 'userpass',
           credUsername,
-          saTokenUrl: '',
         },
       };
       if (options.id) {
-        const saved = await getBackendSrv().put(`/api/datasources/${options.id}`, opts);
+        const saved = await silentPut(`/api/datasources/${options.id}`, opts);
         opts.version = saved?.datasource?.version ?? opts.version;
       }
 
-      // Step 2: call /Credential/Connect through the proxy if password is provided
+      // Step 2: call /Credential/Connect through the proxy
       let sessionId: string | undefined;
       if (credPassword) {
-        const body = JSON.stringify({ DomainName: domainName, UserName: credUsername, Password: credPassword });
+        const body = JSON.stringify({ DomainName: currentDomain, UserName: credUsername, Password: credPassword });
         sessionId = await new Api('/api/datasources/proxy/' + options.id, '').get(
           'POST',
           '/Credential/Connect',
@@ -291,242 +270,102 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
 
       const final: any = {
         ...opts,
-        jsonData: { ...opts.jsonData, httpHeaderName1: 'SessionId' } as any,
+        jsonData: {
+          ...opts.jsonData,
+          httpHeaderName1: 'SessionId',
+          oauthPassThru: false,
+        },
         secureJsonData: finalSecureJsonData,
         secureJsonFields: {
-          ...opts.secureJsonFields,
-          ...(credPassword ? { password: true, credPassword: true } : {}),
-          ...(sessionId ? { httpHeaderValue1: true } : {}),
+          ...options.secureJsonFields,
+          httpHeaderValue1: true,
+          password: true,
+          credPassword: true,
         },
       };
+
       if (options.id) {
-        const saved2 = await getBackendSrv().put(`/api/datasources/${options.id}`, final);
-        final.version = saved2?.datasource?.version ?? final.version;
-        if (saved2?.datasource?.secureJsonFields) {
-          final.secureJsonFields = saved2.datasource.secureJsonFields;
+        const saved = await silentPut(`/api/datasources/${options.id}`, final);
+        final.version = saved?.datasource?.version ?? opts.version;
+        if (saved?.datasource?.secureJsonFields) {
+          final.secureJsonFields = saved.datasource.secureJsonFields;
         }
       }
+
       onOptionsChange(final);
       setCredPassword('');
       setCredStatus('idle');
       setSetCount((c) => c + 1);
-      appEvents.emit(AppEvents.alertSuccess, ['Connected successfully']);
+      appEvents.emit(AppEvents.alertSuccess, ['Connected successfully. SessionId set as custom HTTP header.']);
     } catch (err) {
       if (options.id) {
         try {
           const current = await getBackendSrv().get(`/api/datasources/${options.id}`);
           onOptionsChange({ ...options, version: current.version });
-        } catch (_) {
-          // ignore version sync failure
-        }
+        } catch (_) {}
       }
       setCredError((err as any)?.data?.ErrorMessage ?? (err as any)?.message ?? 'Connection failed');
       setCredStatus('error');
     }
   };
 
-  // Service Account: fetch an access_token from Auth0 using client_credentials grant,
-  // then store it as "Authorization: Bearer <token>" custom HTTP header.
-  // The Grafarg proxy injects this header on every request to Famark.
-  const onSaveServiceAccount = async () => {
-    // Client secret is required every time because it cannot be read back after encryption.
-    const missing = [
-      !domainName && 'Domain Name',
-      !saTokenUrl && 'Token URL',
-      !saClientId && 'Client ID',
-      !saClientSecret && 'Client Secret',
-      !saAudience && 'Audience',
-    ].filter(Boolean);
-    if (missing.length) {
-      setSaError(`${missing.join(missing.length === 2 ? ' and ' : ', ')} required`);
-      setSaStatus('error');
-      return;
-    }
-
-    setSaStatus('saving');
-    setSaError('');
-    try {
-      const latestVersion = await fetchLatestVersion();
-
-      // Step 1: Fetch an access_token from Auth0 using client_credentials grant.
-      const tokenResp = await fetch(saTokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'client_credentials',
-          client_id: saClientId,
-          client_secret: saClientSecret,
-          audience: saAudience,
-        }),
-      });
-      if (!tokenResp.ok) {
-        let errMsg = 'Token endpoint returned ' + tokenResp.status;
-        try {
-          const errData = await tokenResp.json();
-          errMsg += ': ' + (errData.error_description ?? errData.error ?? JSON.stringify(errData));
-        } catch (_) {
-          errMsg += ': ' + (await tokenResp.text());
-        }
-        throw new Error(errMsg);
-      }
-      const tokenData = await tokenResp.json();
-      const accessToken = tokenData.access_token;
-      if (!accessToken) {
-        throw new Error('No access_token in token response');
-      }
-
-      // Step 2: Store the Bearer token as a custom HTTP header.
-      // The Grafarg proxy automatically injects "Authorization: Bearer <token>" on every request.
-      const final: any = {
-        ...options,
-        version: latestVersion,
-        url: combinedUrl(baseUrl, domainName),
-        jsonData: {
-          ...options.jsonData,
-          baseUrl,
-          domainName,
-          authMode: 'serviceaccount',
-          saTokenUrl,
-          saClientId,
-          saAudience,
-          oauthPassThru: false,
-          httpHeaderName1: 'Authorization',
-          credUsername: undefined,
-        } as any,
-        secureJsonData: {
-          ...(options.secureJsonData ?? {}),
-          httpHeaderValue1: `Bearer ${accessToken}`,
-          password: ' ',
-          credPassword: ' ',
-        },
-        secureJsonFields: {
-          ...options.secureJsonFields,
-          httpHeaderValue1: true,
-          password: false,
-          credPassword: false,
-        },
-      };
-      if (options.id) {
-        const saved = await getBackendSrv().put(`/api/datasources/${options.id}`, final);
-        final.version = saved?.datasource?.version ?? final.version;
-        if (saved?.datasource?.secureJsonFields) {
-          final.secureJsonFields = saved.datasource.secureJsonFields;
-        }
-      }
-      onOptionsChange(final);
-      setSaClientSecret('');
-      setSaStatus('idle');
-      setSetCount((c) => c + 1);
-      appEvents.emit(AppEvents.alertSuccess, ['Service Account connected successfully']);
-    } catch (err) {
-      if (options.id) {
-        try {
-          const current = await getBackendSrv().get(`/api/datasources/${options.id}`);
-          onOptionsChange({ ...options, version: current.version });
-        } catch (_) {
-          // ignore version sync failure
-        }
-      }
-      setSaError(
-        (err as any)?.data?.ErrorMessage ?? (err as any)?.data?.message ?? (err as any)?.message ?? 'Connection failed'
-      );
-      setSaStatus('error');
-    }
-  };
-
-  const combined = combinedUrl(baseUrl, domainName);
   const httpHeaderKey = `${(options.jsonData as any).httpHeaderName1 ?? 'none'}-${setCount}`;
 
   return (
     <>
-      <h3 className="page-heading">HTTP</h3>
+      {/* Famark Auth Section (at the top, above HTTP) */}
+      <h3 className="page-heading">Famark Auth</h3>
       <div className="gf-form-group">
-        {/* URL */}
-        <div className="gf-form">
-          <InlineFieldRow>
-            <InlineField label="URL" labelWidth={20} tooltip="Base API URL, e.g. https://www.famark.com/Host/api.svc/">
-              <Input
-                width={40}
-                value={baseUrl}
-                onChange={onBaseUrlChange}
-                placeholder="https://www.famark.com/Host/api.svc/"
-              />
-            </InlineField>
-          </InlineFieldRow>
-        </div>
-
-        {/* Domain Name */}
-        <div className="gf-form">
-          <InlineFieldRow>
-            <InlineField label="Domain Name" labelWidth={20} tooltip="Your Famark domain, e.g. 'Starter'">
-              <Input width={40} value={domainName} onChange={onDomainNameChange} placeholder="Starter" />
-            </InlineField>
-          </InlineFieldRow>
-        </div>
-
-        {/* Combined URL */}
-        <div className="gf-form">
-          <InlineFieldRow>
-            <InlineField
-              label="Combined URL"
-              labelWidth={20}
-              tooltip="The full URL sent to the API (Base URL + Domain)"
-            >
-              <Input width={40} value={combined} readOnly />
-            </InlineField>
-          </InlineFieldRow>
-        </div>
-
-        {/* Whitelisted Cookies */}
-        {options.access !== 'direct' && (
-          <div className="gf-form">
-            <InlineFormLabel
-              width={20}
-              tooltip="Grafarg Proxy deletes forwarded cookies by default. Specify cookies by name that should be forwarded to the data source."
-            >
-              Whitelisted Cookies
-            </InlineFormLabel>
-            <TagsInput
-              tags={options.jsonData.keepCookies}
-              onChange={(cookies) =>
-                onOptionsChange({ ...options, jsonData: { ...options.jsonData, keepCookies: cookies } })
-              }
-            />
-          </div>
-        )}
-
-        {/* Auth Mode toggle */}
         <div className="gf-form">
           <InlineFormLabel
             width={20}
-            tooltip="OAuth Forwarding: passes the signed-in user token. User/Password: fetches a SessionId from Famark. Service Account: uses OAuth2 Client Credentials with auto token refresh."
+            tooltip="OAuth Forwarding: passes the signed-in user token. User/Password: fetches a SessionId from Famark."
           >
             Auth Mode
           </InlineFormLabel>
           <RadioButtonGroup
             options={AUTH_MODE_OPTIONS}
             value={authMode}
-            onChange={(v) => onAuthModeChange(v as 'oauth' | 'userpass' | 'serviceaccount')}
+            onChange={(v) => onAuthModeChange(v as 'oauth' | 'userpass')}
           />
         </div>
 
-        {/* Auth mode switch status */}
-        {modeSwitchStatus === 'saving' && (
-          <div className="gf-form">
-            <span className="gf-form-label">Clearing session...</span>
-          </div>
-        )}
         {modeSwitchStatus === 'error' && (
           <div className="gf-form">
             <FieldValidationMessage>
-              {modeSwitchError + ' — please click Save & Test to finish clearing the session.'}
+              {modeSwitchError + ' - please click Save & Test to finish clearing the session.'}
             </FieldValidationMessage>
+          </div>
+        )}
+
+        {/* OAuth Forwarding */}
+        {authMode === 'oauth' && (
+          <div className="gf-form">
+            <InlineField label="Domain Name" labelWidth={20} tooltip="Your Famark domain, e.g. 'starter'">
+              <Input
+                width={40}
+                value={domainName}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => onDomainChange(e.currentTarget.value)}
+                placeholder="starter"
+              />
+            </InlineField>
           </div>
         )}
 
         {/* User / Password */}
         {authMode === 'userpass' && (
           <>
+            <div className="gf-form">
+              <InlineField label="Domain Name" labelWidth={20} tooltip="Your Famark domain, e.g. 'starter'">
+                <Input
+                  width={40}
+                  value={domainName}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => onDomainChange(e.currentTarget.value)}
+                  placeholder="starter"
+                />
+              </InlineField>
+            </div>
+
             <div className="gf-form">
               <InlineField label="Username" labelWidth={20}>
                 <Input
@@ -579,131 +418,31 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
             {credStatus === 'error' && <FieldValidationMessage>{credError}</FieldValidationMessage>}
           </>
         )}
-
-        {/* Service Account */}
-        {authMode === 'serviceaccount' && (
-          <>
-            <div className="gf-form">
-              <InlineField
-                label="Token URL"
-                labelWidth={20}
-                tooltip="OAuth2 token endpoint, e.g. https://example.auth0.com/oauth/token"
-              >
-                <Input
-                  width={40}
-                  value={saTokenUrl}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSaTokenUrl(e.currentTarget.value)}
-                  onBlur={() => {
-                    onOptionsChange({
-                      ...options,
-                      jsonData: { ...options.jsonData, saTokenUrl } as any,
-                    });
-                  }}
-                  placeholder="https://example.auth0.com/oauth/token"
-                />
-              </InlineField>
-            </div>
-
-            <div className="gf-form">
-              <InlineField label="Client ID" labelWidth={20} tooltip="OAuth2 Client ID for the service account">
-                <Input
-                  width={40}
-                  value={saClientId}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSaClientId(e.currentTarget.value)}
-                  onBlur={() => {
-                    onOptionsChange({
-                      ...options,
-                      jsonData: { ...options.jsonData, saClientId } as any,
-                    });
-                  }}
-                  placeholder="your-client-id"
-                />
-              </InlineField>
-            </div>
-
-            <div className="gf-form">
-              <InlineField
-                label="Client Secret"
-                labelWidth={20}
-                tooltip="OAuth2 Client Secret. Required each time to fetch a fresh Bearer token. Not stored."
-              >
-                <Input
-                  width={40}
-                  type="password"
-                  value={saClientSecret}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSaClientSecret(e.currentTarget.value)}
-                  placeholder="your-client-secret"
-                  autoComplete="new-password"
-                />
-              </InlineField>
-            </div>
-
-            <div className="gf-form">
-              <InlineField
-                label="Audience"
-                labelWidth={20}
-                tooltip="Auth0 API Identifier (audience). Must match the API registered in Auth0, e.g. http://localhost:3000"
-              >
-                <Input
-                  width={40}
-                  value={saAudience}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSaAudience(e.currentTarget.value)}
-                  onBlur={() => {
-                    onOptionsChange({
-                      ...options,
-                      jsonData: { ...options.jsonData, saAudience } as any,
-                    });
-                  }}
-                  placeholder="http://localhost:3000"
-                />
-              </InlineField>
-            </div>
-
-            <div className="gf-form">
-              <Button variant="primary" size="sm" onClick={onSaveServiceAccount} disabled={saStatus === 'saving'}>
-                {saStatus === 'saving' ? 'Connecting...' : 'Connect'}
-              </Button>
-            </div>
-
-            {saStatus === 'error' && <FieldValidationMessage>{saError}</FieldValidationMessage>}
-          </>
-        )}
       </div>
 
+      {/* Standard Grafarg HTTP Settings: handles URL, Access, Whitelisted Cookies, Auth, and Custom HTTP Headers */}
       <DataSourceHttpSettings
         key={httpHeaderKey}
         defaultUrl={DEFAULT_BASE_URL}
-        hideHttpSection={true}
-        dataSourceConfig={{
-          ...options,
-          url: combined,
-          // Pass oauthPassThru as-is — user can freely toggle Forward OAuth Identity
-          jsonData: { ...options.jsonData },
-        }}
+        dataSourceConfig={options}
         onChange={(newOpts) => {
           const jd = newOpts.jsonData as JsonApiDataSourceOptions;
-
-          // Detect if user deleted the SessionId header via the trash icon
           const sessionHeaderDeleted = !!(options.jsonData as any).httpHeaderName1 && !(jd as any).httpHeaderName1;
-
-          // When the header is deleted, mark secure fields as cleared.
-          // The actual DB update happens when the user clicks Save & Test.
           const updatedSecureJsonFields = sessionHeaderDeleted
             ? { ...newOpts.secureJsonFields, httpHeaderValue1: false, password: false, credPassword: false }
             : newOpts.secureJsonFields;
 
+          // When user edits URL in DataSourceHttpSettings, auto-extract the domain name from the URL ending
+          const urlDomain = extractDomainFromUrl(newOpts.url);
+
           onOptionsChange({
             ...newOpts,
-            url: combinedUrl(jd.baseUrl ?? baseUrl, jd.domainName ?? domainName),
             jsonData: {
               ...jd,
-              baseUrl: jd.baseUrl ?? baseUrl,
-              domainName: jd.domainName ?? domainName,
-              // Preserve user's oauthPassThru toggle — do NOT hardcode it
+              domainName: urlDomain !== undefined ? urlDomain : jd.domainName,
               oauthPassThru: jd.oauthPassThru,
             },
             secureJsonFields: updatedSecureJsonFields,
-            // Overwrite secure values with a placeholder so the DB clears them on Save & Test
             ...(sessionHeaderDeleted
               ? {
                   secureJsonData: {

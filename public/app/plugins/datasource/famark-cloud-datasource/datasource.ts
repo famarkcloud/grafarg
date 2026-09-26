@@ -222,7 +222,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       return [interpolate(key), interpolate(value)];
     };
 
-    // All auth modes (OAuth Forwarding, User/Password, Service Account) now work
+    // All auth modes (OAuth Forwarding, User/Password) now work
     // through the Grafarg proxy. The SessionId header is stored as a custom HTTP
     // header (httpHeaderName1/httpHeaderValue1) and injected automatically by the
     // proxy transport layer. No client-side header injection needed.

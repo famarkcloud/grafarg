@@ -47,15 +47,9 @@ export interface JsonApiDataSourceOptions extends DataSourceJsonData {
   oauthPassThru?: boolean;
   keepCookies?: string[];
 
-  // Auth mode: 'oauth' | 'userpass' | 'serviceaccount'
-  authMode?: 'oauth' | 'userpass' | 'serviceaccount';
+  // Auth mode: 'oauth' | 'userpass'
+  authMode?: 'oauth' | 'userpass';
 
   // User/Password mode
   credUsername?: string;
-
-  // Service Account (OAuth2 Client Credentials) mode — non-secret fields only
-  // saClientSecret goes in secureJsonData (encrypted), not here
-  saTokenUrl?: string;
-  saClientId?: string;
-  saAudience?: string; // Auth0 API Identifier, e.g. http://localhost:3000
 }
