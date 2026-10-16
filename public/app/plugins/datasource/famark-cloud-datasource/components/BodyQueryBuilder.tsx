@@ -102,7 +102,7 @@ export const fetchAttributeOptions = async (
     },
     OrderBy: 'SystemName',
   });
-  const records = await datasource.api.get('POST', ATTRIBUTE_PATH, [], headers, body);
+  const records = await datasource.api.get('POST', ATTRIBUTE_PATH, [], headers, body, { hideFromInspector: true });
   return records.map((r: any) => ({ label: r.SystemName, value: r.SystemName, attributeType: r.AttributeType }));
 };
 
