@@ -60,7 +60,9 @@ export const PathEditor = ({
     (async () => {
       try {
         setEntitiesLoading(true);
-        const data = await datasource.api.get('POST', entityPath, [], headers, entityBody, { hideFromInspector: true });
+        const data = await (datasource.api as any).cachedGet(300, 'POST', entityPath, [], headers, entityBody, {
+          hideFromInspector: true,
+        });
         if (!active) {
           return;
         }
