@@ -1,3 +1,4 @@
+import { syncFieldsFromBody } from './components/FieldEditor';
 import {
   ArrayVector,
   DataFrame,
@@ -120,7 +121,6 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
     }
 
     const isUserPassAuth = authMode === 'userpass' && Boolean(password);
-    const errorPrefix = isUserPassAuth ? 'Famark Auth Failed' : 'Famark Domain Check Failed';
 
     try {
       const body = { DomainName: domain, ...(isUserPassAuth ? { UserName: username, Password: password } : {}) };
@@ -136,7 +136,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       if (res?.ErrorMessage) {
         return {
           status: 'error',
-          message: `${errorPrefix}: ${res.ErrorMessage}`,
+          message: res.ErrorMessage,
         };
       }
 
@@ -168,13 +168,10 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
     } catch (authErr) {
       const err = authErr as any;
       const errMsg =
-        err?.data?.ErrorMessage ??
-        err?.data?.Message ??
-        err?.message ??
-        (isUserPassAuth ? 'Invalid Username or Password' : 'Invalid Domain Name');
+        err?.data?.ErrorMessage ?? err?.data?.Message ?? err?.statusText ?? err?.message ?? 'Connection failed';
       return {
         status: 'error',
-        message: `${errorPrefix}: ${errMsg}`,
+        message: errMsg,
       };
     }
   }
@@ -188,7 +185,9 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       throw new Error('Query returned empty data');
     }
 
-    const fields: Field[] = (query.fields ?? [])
+    const op = query.urlPath?.split('/').filter(Boolean)[1];
+    const rawFields = query.fields?.[0]?.jsonPath ? query.fields : syncFieldsFromBody(query.body, op, query.fields);
+    const fields: Field[] = (rawFields ?? [])
       .filter((field) => field.jsonPath)
       .map((field, index) => {
         switch (field.language) {
