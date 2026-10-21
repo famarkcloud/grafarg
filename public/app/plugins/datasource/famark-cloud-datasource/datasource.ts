@@ -1,4 +1,3 @@
-import { syncFieldsFromBody } from './components/FieldEditor';
 import {
   ArrayVector,
   DataFrame,
@@ -185,9 +184,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       throw new Error('Query returned empty data');
     }
 
-    const op = query.urlPath?.split('/').filter(Boolean)[1];
-    const rawFields = query.fields?.[0]?.jsonPath ? query.fields : syncFieldsFromBody(query.body, op, query.fields);
-    const fields: Field[] = (rawFields ?? [])
+    const fields: Field[] = (query.fields ?? [])
       .filter((field) => field.jsonPath)
       .map((field, index) => {
         switch (field.language) {

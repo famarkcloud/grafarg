@@ -193,28 +193,14 @@ export const FieldEditor = ({
       .finally(() => setLoading(false));
   }, [datasource, entityId, headers]);
 
-  // ── Auto-fill fields from body ──
-  // Reads Columns, GroupBy, DateTimePart from body JSON and generates correct fields.
-  // Body → Fields only (one-way). Editing fields never changes the body.
+  // Auto-fill if empty
   useEffect(() => {
-    const { columns, groupBy, isValid } = parseBodyFields(body);
-    if (!isValid) {
-      return;
-    }
-    if (columns.length > 0 || groupBy) {
+    if (!value || value.length === 0) {
       const next = syncFieldsFromBody(body, operation, value, attributes);
-      const unchanged =
-        next.length === value.length &&
-        value.every((f, i) => f.jsonPath === next[i].jsonPath && f.type === next[i].type && f.name === next[i].name);
-
-      if (!unchanged) {
-        onChange(next);
-      }
-    } else if (!value || value.length === 0) {
-      onChange([EMPTY_FIELD]);
+      onChange(next.length > 0 && next[0]?.jsonPath ? next : [EMPTY_FIELD]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body, isStats, operation, attributes]); // onChange excluded: stable ref
+  }, [body, operation, attributes]);
 
   // ── Field update helpers ──
 

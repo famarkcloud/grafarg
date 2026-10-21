@@ -203,6 +203,35 @@ const ValueInputs: React.FC<ValueInputsProps> = ({ operator, values, onChange })
 
 // ── Main Component ──
 
+interface OrderByItem {
+  field: string;
+  desc: boolean;
+}
+
+const parseOrderBy = (raw: string): OrderByItem[] => {
+  if (!raw || !raw.trim()) {
+    return [{ field: '', desc: false }];
+  }
+  const items = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const match = part.match(/^(.+?)\s+(desc|asc)$/i);
+      if (match) {
+        return { field: match[1].trim(), desc: match[2].toLowerCase() === 'desc' };
+      }
+      return { field: part, desc: false };
+    });
+  return items.length ? items : [{ field: '', desc: false }];
+};
+
+const formatOrderBy = (items: OrderByItem[]): string =>
+  items
+    .filter((it) => it.field)
+    .map((it) => (it.desc ? `${it.field} desc` : it.field))
+    .join(', ');
+
 interface Props {
   datasource: JsonDataSource;
   entityId?: string;
@@ -219,6 +248,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
   // State
   const [columns, setColumns] = useState<string[]>(['']);
   const [orderBy, setOrderBy] = useState('');
+  const [orderList, setOrderList] = useState<OrderByItem[]>([{ field: '', desc: false }]);
   const [dateTimePart, setDateTimePart] = useState('');
   const [dateTimeInterval, setDateTimeInterval] = useState('');
   const [attributes, setAttributes] = useState<Array<SelectableValue<string>>>([]);
@@ -237,6 +267,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
     const parsed = parseBody(body);
     setColumns(parsed.columns.length ? parsed.columns : ['']);
     setOrderBy(isStats ? parsed.groupBy : parsed.orderBy);
+    setOrderList(parseOrderBy(parsed.orderBy));
     setDateTimePart(parsed.dateTimePart);
     setDateTimeInterval(parsed.dateTimeInterval);
     if (parsed.filter?.Conditions?.length > 0) {
@@ -308,7 +339,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
     const p = parseBody(body);
     saveColumns(
       p.columns.length ? p.columns : columns,
-      isStats ? p.groupBy || orderBy : p.orderBy || orderBy,
+      isStats ? p.groupBy || orderBy : p.orderBy || formatOrderBy(orderList),
       p.dateTimePart || dateTimePart,
       p.dateTimeInterval || dateTimeInterval,
       conds
@@ -325,7 +356,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
       updated[index] = value ?? '';
     }
     setColumns(updated);
-    saveColumns(updated, orderBy);
+    saveColumns(updated, isStats ? orderBy : formatOrderBy(orderList));
   };
 
   const addColumn = () => setColumns([...columns, '']);
@@ -342,6 +373,26 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
       saveColumns(columns, v);
     }
   };
+
+  const changeOrderField = (index: number, field?: string) => {
+    const updated = [...orderList];
+    if (!field && updated.length > 1) {
+      updated.splice(index, 1);
+    } else {
+      updated[index] = { ...updated[index], field: field ?? '' };
+    }
+    setOrderList(updated);
+    saveColumns(columns, formatOrderBy(updated));
+  };
+
+  const changeOrderDesc = (index: number, desc: boolean) => {
+    const updated = [...orderList];
+    updated[index] = { ...updated[index], desc };
+    setOrderList(updated);
+    saveColumns(columns, formatOrderBy(updated));
+  };
+
+  const addOrderItem = () => setOrderList([...orderList, { field: '', desc: false }]);
 
   // ── Filter Actions ──
 
@@ -545,15 +596,59 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
       ) : (
         <InlineFieldRow>
           <InlineField label="OrderBy" grow>
-            <Select
-              placeholder="OrderBy"
-              isLoading={loadingAttrs}
-              isClearable
-              value={orderBy ? { label: orderBy, value: orderBy } : undefined}
-              options={attributes}
-              onChange={(v) => changeOrderBy(v?.value)}
-              width={20}
-            />
+            <div
+              className={css`
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 4px;
+              `}
+            >
+              {orderList.map((item, i) => (
+                <div
+                  key={i}
+                  className={css`
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                  `}
+                >
+                  <Select
+                    placeholder="OrderBy"
+                    isLoading={loadingAttrs}
+                    isClearable
+                    value={item.field ? { label: item.field, value: item.field } : undefined}
+                    options={attributes}
+                    onChange={(v) => changeOrderField(i, v?.value)}
+                    width={20}
+                  />
+                  <label
+                    className="gf-form-label"
+                    style={{
+                      cursor: 'pointer',
+                      margin: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      height: '32px',
+                      padding: '0 10px',
+                      gap: '6px',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.desc}
+                      onChange={(e) => changeOrderDesc(i, e.currentTarget.checked)}
+                      style={{ margin: 0, cursor: 'pointer', width: '15px', height: '15px' }}
+                    />
+                    <span>Desc</span>
+                  </label>
+                </div>
+              ))}
+              <a className="gf-form-label" onClick={addOrderItem}>
+                <Icon name="plus" />
+              </a>
+            </div>
           </InlineField>
         </InlineFieldRow>
       )}
