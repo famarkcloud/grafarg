@@ -1,12 +1,5 @@
 import { DataSourcePluginOptionsEditorProps } from '@grafarg/data';
-import {
-  DataSourceHttpSettings,
-  InlineField,
-  InlineFieldRow,
-  InlineFormLabel,
-  Input,
-  RadioButtonGroup,
-} from '@grafarg/ui';
+import { DataSourceHttpSettings, InlineField, Input, RadioButtonGroup } from '@grafarg/ui';
 import React, { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { JsonApiDataSourceOptions } from '../types';
 import { setSessionPassword, setSessionListener } from '../datasource';
@@ -154,17 +147,17 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
       <h3 className="page-heading">Famark Auth</h3>
       <div className="gf-form-group">
         <div className="gf-form">
-          <InlineFormLabel
-            width={20}
+          <InlineField
+            label="Auth Mode"
+            labelWidth={20}
             tooltip="OAuth Forwarding: passes the signed-in user token. User/Password: fetches a SessionId from Famark."
           >
-            Auth Mode
-          </InlineFormLabel>
-          <RadioButtonGroup
-            options={AUTH_MODE_OPTIONS}
-            value={authMode}
-            onChange={(v) => onAuthModeChange(v as 'oauth' | 'userpass')}
-          />
+            <RadioButtonGroup
+              options={AUTH_MODE_OPTIONS}
+              value={authMode}
+              onChange={(v) => onAuthModeChange(v as 'oauth' | 'userpass')}
+            />
+          </InlineField>
         </div>
 
         {/* Domain Name — shown for both oauth and userpass modes */}
@@ -263,17 +256,17 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
       />
 
       <h3 className="page-heading">Misc</h3>
-      <InlineFieldRow>
-        <InlineField label="Query string" tooltip="Add a custom query string to your queries.">
+      <div className="gf-form">
+        <InlineField label="Query string" labelWidth={20} tooltip="Add a custom query string to your queries.">
           <Input
-            width={50}
+            width={40}
             value={options.jsonData.queryParams}
             onChange={onParamsChange}
             spellCheck={false}
             placeholder="page=1&limit=100"
           />
         </InlineField>
-      </InlineFieldRow>
+      </div>
     </>
   );
 };
