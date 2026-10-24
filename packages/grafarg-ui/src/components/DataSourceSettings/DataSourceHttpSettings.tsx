@@ -9,6 +9,7 @@ import { Select } from '../Forms/Legacy/Select/Select';
 import { Input } from '../Forms/Legacy/Input/Input';
 import { Switch } from '../Forms/Legacy/Switch/Switch';
 import { Icon } from '../Icon/Icon';
+import { FormField } from '../FormField/FormField';
 import { InlineFormLabel } from '../FormLabel/FormLabel';
 import { TagsInput } from '../TagsInput/TagsInput';
 import { SigV4AuthSettings } from './SigV4AuthSettings';
@@ -124,18 +125,14 @@ export const DataSourceHttpSettings: React.FC<HttpSettingsProps> = (props) => {
         <h3 className="page-heading">HTTP</h3>
         <div className="gf-form-group">
           <div className="gf-form">
-            <InlineFormLabel width={11} tooltip={urlTooltip}>
-              URL
-            </InlineFormLabel>
-            {urlInput}
+            <FormField label="URL" labelWidth={11} tooltip={urlTooltip} inputEl={urlInput} />
           </div>
 
           {showAccessOptions && (
             <>
               <div className="gf-form-inline">
                 <div className="gf-form">
-                  <InlineFormLabel width={11}>Access</InlineFormLabel>
-                  {accessSelect}
+                  <FormField label="Access" labelWidth={11} inputWidth={20} inputEl={accessSelect} />
                 </div>
                 <div className="gf-form">
                   <label
