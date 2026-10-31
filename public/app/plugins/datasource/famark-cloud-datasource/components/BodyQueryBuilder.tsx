@@ -1,5 +1,5 @@
 import { SelectableValue } from '@grafarg/data';
-import { Icon, InlineField, InlineFieldRow, Input, Select, useTheme } from '@grafarg/ui';
+import { Icon, InlineField, InlineFieldRow, Input, Select } from '@grafarg/ui';
 import { JsonDataSource } from '../datasource';
 import { css } from 'emotion';
 import React, { useEffect, useState } from 'react';
@@ -143,13 +143,13 @@ const ValueInputs: React.FC<ValueInputsProps> = ({ operator, values, onChange })
     return (
       <>
         <Input
-          width={14}
+          width={20}
           placeholder="Value 1"
           value={values[0] || ''}
           onChange={(e) => onChange([e.currentTarget.value, values[1] || ''])}
         />
         <Input
-          width={14}
+          width={20}
           placeholder="Value 2"
           value={values[1] || ''}
           onChange={(e) => onChange([values[0] || '', e.currentTarget.value])}
@@ -165,7 +165,7 @@ const ValueInputs: React.FC<ValueInputsProps> = ({ operator, values, onChange })
         {values.map((val, i) => (
           <React.Fragment key={i}>
             <Input
-              width={12}
+              width={20}
               value={val}
               placeholder={`Value ${i + 1}`}
               onChange={(e) => {
@@ -190,7 +190,9 @@ const ValueInputs: React.FC<ValueInputsProps> = ({ operator, values, onChange })
             )}
           </React.Fragment>
         ))}
-        <Icon name="plus" onClick={() => onChange([...values, ''])} style={{ cursor: 'pointer' }} />
+        <div className="gf-form-label" onClick={() => onChange([...values, ''])}>
+          <Icon name="ellipsis-v" style={{ transform: 'rotate(90deg)' }} />
+        </div>
       </>
     );
   }
@@ -213,7 +215,6 @@ interface Props {
 }
 
 export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, headers, body, onBodyChange, operation }) => {
-  const theme = useTheme();
   const isStats = operation === 'RetrieveStats';
 
   // State
@@ -223,7 +224,6 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
   const [dateTimeInterval, setDateTimeInterval] = useState('');
   const [attributes, setAttributes] = useState<Array<SelectableValue<string>>>([]);
   const [loadingAttrs, setLoadingAttrs] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
 
   // New condition form
   const [newAttr, setNewAttr] = useState('');
@@ -239,9 +239,6 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
     setOrderBy(isStats ? parsed.groupBy : parsed.orderBy);
     setDateTimePart(parsed.dateTimePart);
     setDateTimeInterval(parsed.dateTimeInterval);
-    if (parsed.filter?.Conditions?.length > 0) {
-      setFilterOpen(true);
-    }
   }, [body, isStats]);
 
   // ── Fetch attributes when entity changes ──
@@ -387,8 +384,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
   // ── Styles ──
   const rowStyle = css`
     display: flex;
-    gap: 8px;
-    margin-bottom: 4px;
+    gap: 4px;
     align-items: center;
     flex-wrap: wrap;
   `;
@@ -406,6 +402,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
       <InlineFieldRow>
         <InlineField
           label="Columns"
+          labelWidth={16}
           grow
           className={css`
             flex: 1 1 0;
@@ -416,7 +413,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
             className={css`
               display: flex;
               flex-wrap: wrap;
-              gap: ${theme.spacing.sm};
+              gap: 4px;
               align-items: center;
               width: 100%;
             `}
@@ -440,10 +437,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                     <div
                       className={css`
                         display: inline-flex;
-                        gap: 2px;
-                        border: 1px solid rgba(204, 204, 220, 0.15);
-                        border-radius: 4px;
-                        padding: 2px;
+                        gap: 4px;
                       `}
                     >
                       <Select
@@ -452,7 +446,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                         options={AGGREGATION_OPTIONS}
                         isClearable
                         onChange={(v) => changeColumn(i, buildColumn(v?.value ?? '', attr))}
-                        width={14}
+                        width={20}
                       />
                       <Select
                         placeholder="Attribute"
@@ -461,7 +455,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                         options={attributes}
                         isClearable
                         onChange={(v) => changeColumn(i, buildColumn(agg, v?.value ?? ''))}
-                        width={18}
+                        width={20}
                       />
                     </div>
                   </React.Fragment>
@@ -480,9 +474,9 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                 />
               );
             })}
-            <a className="gf-form-label" onClick={addColumn}>
+            <div className="gf-form-label" onClick={addColumn}>
               <Icon name="plus" />
-            </a>
+            </div>
           </div>
         </InlineField>
       </InlineFieldRow>
@@ -491,7 +485,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
       {isStats ? (
         <>
           <InlineFieldRow>
-            <InlineField label="GroupBy" grow>
+            <InlineField label="GroupBy" labelWidth={16} grow>
               <Select
                 placeholder="GroupBy"
                 isLoading={loadingAttrs}
@@ -506,7 +500,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
           {attrType(orderBy) === 'TypeDateTime' && (
             <>
               <InlineFieldRow>
-                <InlineField label="DateTimePart">
+                <InlineField label="DateTimePart" labelWidth={16}>
                   <Select
                     placeholder="DateTimePart"
                     isClearable
@@ -520,19 +514,19 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                       }
                       saveColumns(columns, orderBy, part, part === 'Time' ? dateTimeInterval : '');
                     }}
-                    width={16}
+                    width={20}
                   />
                 </InlineField>
               </InlineFieldRow>
               {dateTimePart === 'Time' && (
                 <InlineFieldRow>
-                  <InlineField label="DateTimeInterval">
+                  <InlineField label="DateTimeInterval" labelWidth={16}>
                     <Input
                       placeholder="e.g. 1h, 1m"
                       value={dateTimeInterval}
                       onChange={(e) => setDateTimeInterval(e.currentTarget.value)}
                       onBlur={(e) => saveColumns(columns, orderBy, dateTimePart, e.currentTarget.value)}
-                      width={16}
+                      width={20}
                     />
                   </InlineField>
                 </InlineFieldRow>
@@ -542,7 +536,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
         </>
       ) : (
         <InlineFieldRow>
-          <InlineField label="OrderBy" grow>
+          <InlineField label="OrderBy" labelWidth={16}>
             <Select
               placeholder="OrderBy"
               isLoading={loadingAttrs}
@@ -558,142 +552,113 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
 
       {/* ── Filter Section ── */}
       <InlineFieldRow>
-        <div
+        <InlineField
+          label="Filter"
+          labelWidth={16}
+          grow
           className={css`
-            display: flex;
-            flex-direction: column;
-            width: 100%;
+            flex: 1 1 0;
+            min-width: 0;
           `}
         >
-          {/* Toggle */}
           <div
-            onClick={() => setFilterOpen(!filterOpen)}
             className={css`
               display: flex;
-              align-items: center;
-              cursor: pointer;
-              font-weight: 500;
-              padding: 4px 8px;
-              border-radius: 4px;
-              background-color: ${theme.colors.bg2};
-              width: fit-content;
-              user-select: none;
+              flex-direction: column;
+              gap: 4px;
+              width: 100%;
             `}
           >
-            <span style={{ marginRight: '8px' }}>Filter</span>
-            <Icon name={filterOpen ? 'angle-down' : 'angle-right'} />
-          </div>
+            {conditions.map((c: any, i: number) => {
+              const isTs = isTimeseries(c);
+              const displayOp = isTs ? TIMESERIES_OPERATOR : c.Operator;
+              const opts = getConditionOptions(isTs ? 'TypeDateTime' : attrType(c.FieldName));
+              const vals: string[] = c.Values || [''];
 
-          {/* Conditions */}
-          {filterOpen && (
-            <div
-              className={css`
-                padding-left: 24px;
-                padding-top: 12px;
-                padding-bottom: ${theme.spacing.sm};
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-              `}
-            >
-              {/* Existing conditions */}
-              {conditions.map((c: any, i: number) => {
-                const isTs = isTimeseries(c);
-                const displayOp = isTs ? TIMESERIES_OPERATOR : c.Operator;
-                const opts = getConditionOptions(isTs ? 'TypeDateTime' : attrType(c.FieldName));
-                const vals: string[] = c.Values || [''];
-
-                return (
-                  <div key={i} className={rowStyle}>
-                    <Select
-                      width={16}
-                      options={attributes}
-                      value={
-                        attributes.find((a) => a.value === c.FieldName) || { label: c.FieldName, value: c.FieldName }
-                      }
-                      onChange={(v) => updateCondition(i, { FieldName: v.value })}
-                      isLoading={loadingAttrs}
-                    />
-                    <Select
-                      width={16}
-                      options={opts}
-                      value={
-                        opts.find((o) => o.value === displayOp) || {
-                          label: CONDITION_LABELS[c.Operator] || String(c.Operator),
-                          value: c.Operator,
-                        }
-                      }
-                      onChange={(v) => {
-                        const op = v.value!;
-                        const resolvedOp = op === TIMESERIES_OPERATOR ? 6 : op;
-                        updateCondition(i, { Operator: resolvedOp, Values: defaultValues(op, vals) });
-                      }}
-                    />
-                    <label style={isNotStyle}>
-                      <input
-                        type="checkbox"
-                        checked={!!c.IsNot}
-                        onChange={(e) => updateCondition(i, { IsNot: e.target.checked || undefined })}
-                      />
-                      Is Not
-                    </label>
-                    <ValueInputs
-                      operator={displayOp}
-                      values={vals}
-                      onChange={(v) => updateCondition(i, { Values: v })}
-                    />
-                    <Icon
-                      name="trash-alt"
-                      onClick={() => removeCondition(i)}
-                      style={{ cursor: 'pointer', color: theme.palette.red }}
-                    />
-                  </div>
-                );
-              })}
-
-              {/* New condition form */}
-              <div key={formKey} className={rowStyle} style={{ marginTop: 8 }}>
-                <Select
-                  width={16}
-                  placeholder="Attribute"
-                  options={attributes}
-                  value={
-                    newAttr ? attributes.find((a) => a.value === newAttr) || { label: newAttr, value: newAttr } : null
-                  }
-                  onChange={(v) => {
-                    setNewAttr(v?.value || '');
-                    // Reset operator if switching away from DateTime
-                    if (attrType(v?.value || '') !== 'TypeDateTime' && newOperator === TIMESERIES_OPERATOR) {
-                      setNewOperator(0);
-                      setNewValues(['']);
+              return (
+                <div key={i} className={rowStyle}>
+                  <Select
+                    width={20}
+                    options={attributes}
+                    value={
+                      attributes.find((a) => a.value === c.FieldName) || { label: c.FieldName, value: c.FieldName }
                     }
-                  }}
-                  isLoading={loadingAttrs}
-                  isClearable
-                />
-                <Select
-                  width={16}
-                  placeholder="Condition"
-                  options={getConditionOptions(attrType(newAttr))}
-                  value={getConditionOptions(attrType(newAttr)).find((o) => o.value === newOperator)}
-                  onChange={(v) => {
-                    const op = v.value!;
-                    setNewOperator(op);
-                    setNewValues(defaultValues(op, newValues));
-                  }}
-                />
-                <label style={isNotStyle}>
-                  <input type="checkbox" checked={newIsNot} onChange={(e) => setNewIsNot(e.target.checked)} />
-                  Is Not
-                </label>
-                <ValueInputs operator={newOperator} values={newValues} onChange={setNewValues} />
-                <div className="gf-form-label" onClick={addCondition} style={{ cursor: 'pointer' }}>
-                  <Icon name="plus" /> Add
+                    onChange={(v) => updateCondition(i, { FieldName: v.value })}
+                    isLoading={loadingAttrs}
+                  />
+                  <Select
+                    width={20}
+                    options={opts}
+                    value={
+                      opts.find((o) => o.value === displayOp) || {
+                        label: CONDITION_LABELS[c.Operator] || String(c.Operator),
+                        value: c.Operator,
+                      }
+                    }
+                    onChange={(v) => {
+                      const op = v.value!;
+                      const resolvedOp = op === TIMESERIES_OPERATOR ? 6 : op;
+                      updateCondition(i, { Operator: resolvedOp, Values: defaultValues(op, vals) });
+                    }}
+                  />
+                  <label style={isNotStyle}>
+                    <input
+                      type="checkbox"
+                      checked={!!c.IsNot}
+                      onChange={(e) => updateCondition(i, { IsNot: e.target.checked || undefined })}
+                    />
+                    Is Not
+                  </label>
+                  <ValueInputs operator={displayOp} values={vals} onChange={(v) => updateCondition(i, { Values: v })} />
+                  <div className="gf-form-label" onClick={() => removeCondition(i)}>
+                    <Icon name="trash-alt" />
+                  </div>
                 </div>
+              );
+            })}
+
+            {/* New condition form */}
+            <div key={formKey} className={rowStyle}>
+              <Select
+                width={20}
+                placeholder="Attribute"
+                options={attributes}
+                value={
+                  newAttr ? attributes.find((a) => a.value === newAttr) || { label: newAttr, value: newAttr } : null
+                }
+                onChange={(v) => {
+                  setNewAttr(v?.value || '');
+                  // Reset operator if switching away from DateTime
+                  if (attrType(v?.value || '') !== 'TypeDateTime' && newOperator === TIMESERIES_OPERATOR) {
+                    setNewOperator(0);
+                    setNewValues(['']);
+                  }
+                }}
+                isLoading={loadingAttrs}
+                isClearable
+              />
+              <Select
+                width={20}
+                placeholder="Condition"
+                options={getConditionOptions(attrType(newAttr))}
+                value={getConditionOptions(attrType(newAttr)).find((o) => o.value === newOperator)}
+                onChange={(v) => {
+                  const op = v.value!;
+                  setNewOperator(op);
+                  setNewValues(defaultValues(op, newValues));
+                }}
+              />
+              <label style={isNotStyle}>
+                <input type="checkbox" checked={newIsNot} onChange={(e) => setNewIsNot(e.target.checked)} />
+                Is Not
+              </label>
+              <ValueInputs operator={newOperator} values={newValues} onChange={setNewValues} />
+              <div className="gf-form-label" onClick={addCondition}>
+                <Icon name="plus" />
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        </InlineField>
       </InlineFieldRow>
     </>
   );

@@ -125,15 +125,18 @@ export const TabbedQueryEditor = ({
       content: (
         <>
           <InlineFieldRow>
-            <InlineField label="Body view">
-              <RadioButtonGroup
-                value={bodyMode}
-                onChange={(v) => setBodyMode((v as 'builder' | 'json') ?? 'builder')}
-                options={[
-                  { label: 'Query Builder', value: 'builder' },
-                  { label: 'Edit JSON', value: 'json' },
-                ]}
-              />
+            <InlineField label="Body view" labelWidth={16}>
+              <div style={{ width: 324 }}>
+                <RadioButtonGroup
+                  fullWidth
+                  value={bodyMode}
+                  onChange={(v) => setBodyMode((v as 'builder' | 'json') ?? 'builder')}
+                  options={[
+                    { label: 'Query Builder', value: 'builder' },
+                    { label: 'Edit JSON', value: 'json' },
+                  ]}
+                />
+              </div>
             </InlineField>
           </InlineFieldRow>
           {bodyMode === 'builder' ? (
