@@ -190,7 +190,7 @@ const ValueInputs: React.FC<ValueInputsProps> = ({ operator, values, onChange })
             )}
           </React.Fragment>
         ))}
-        <div className="gf-form-label" onClick={() => onChange([...values, ''])}>
+        <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={() => onChange([...values, ''])}>
           <Icon name="ellipsis-v" style={{ transform: 'rotate(90deg)' }} />
         </div>
       </>
@@ -474,7 +474,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                 />
               );
             })}
-            <div className="gf-form-label" onClick={addColumn}>
+            <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={addColumn}>
               <Icon name="plus" />
             </div>
           </div>
@@ -610,7 +610,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                     Is Not
                   </label>
                   <ValueInputs operator={displayOp} values={vals} onChange={(v) => updateCondition(i, { Values: v })} />
-                  <div className="gf-form-label" onClick={() => removeCondition(i)}>
+                  <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={() => removeCondition(i)}>
                     <Icon name="trash-alt" />
                   </div>
                 </div>
@@ -653,7 +653,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                 Is Not
               </label>
               <ValueInputs operator={newOperator} values={newValues} onChange={setNewValues} />
-              <div className="gf-form-label" onClick={addCondition}>
+              <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={addCondition}>
                 <Icon name="plus" />
               </div>
             </div>
