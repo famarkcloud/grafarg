@@ -88,6 +88,31 @@ const parseBody = (body: string) => {
   }
 };
 
+interface OrderByItem {
+  field: string;
+  desc: boolean;
+}
+
+const EMPTY_ORDER_ITEM: OrderByItem = { field: '', desc: false };
+
+const parseOrderBy = (orderBy: string): OrderByItem[] => {
+  const items = orderBy
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [field, direction] = part.split(/\s+/);
+      return { field, desc: direction?.toLowerCase() === 'desc' };
+    });
+  return items.length ? items : [EMPTY_ORDER_ITEM];
+};
+
+const formatOrderBy = (items: OrderByItem[]): string =>
+  items
+    .filter((item) => item.field)
+    .map((item) => (item.desc ? `${item.field} desc` : item.field))
+    .join(', ');
+
 /** Fetch entity attributes from the API */
 export const fetchAttributeOptions = async (
   datasource: JsonDataSource,
@@ -219,7 +244,8 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
 
   // State
   const [columns, setColumns] = useState<string[]>(['']);
-  const [orderBy, setOrderBy] = useState('');
+  const [groupBy, setGroupBy] = useState('');
+  const [orderList, setOrderList] = useState<OrderByItem[]>([EMPTY_ORDER_ITEM]);
   const [dateTimePart, setDateTimePart] = useState('');
   const [dateTimeInterval, setDateTimeInterval] = useState('');
   const [attributes, setAttributes] = useState<Array<SelectableValue<string>>>([]);
@@ -236,7 +262,8 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
   useEffect(() => {
     const parsed = parseBody(body);
     setColumns(parsed.columns.length ? parsed.columns : ['']);
-    setOrderBy(isStats ? parsed.groupBy : parsed.orderBy);
+    setGroupBy(parsed.groupBy);
+    setOrderList(parseOrderBy(parsed.orderBy));
     setDateTimePart(parsed.dateTimePart);
     setDateTimeInterval(parsed.dateTimeInterval);
   }, [body, isStats]);
@@ -303,7 +330,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
     const p = parseBody(body);
     saveColumns(
       p.columns.length ? p.columns : columns,
-      isStats ? p.groupBy || orderBy : p.orderBy || orderBy,
+      isStats ? p.groupBy || groupBy : p.orderBy || formatOrderBy(orderList),
       p.dateTimePart || dateTimePart,
       p.dateTimeInterval || dateTimeInterval,
       conds
@@ -320,15 +347,36 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
       updated[index] = value ?? '';
     }
     setColumns(updated);
-    saveColumns(updated, orderBy);
+    saveColumns(updated, isStats ? groupBy : formatOrderBy(orderList));
   };
 
   const addColumn = () => setColumns([...columns, '']);
 
-  const changeOrderBy = (value?: string) => {
+  // ── OrderBy Actions ──
+  const changeOrderField = (index: number, field?: string) => {
+    const updated = [...orderList];
+    if (!field && updated.length > 1) {
+      updated.splice(index, 1);
+    } else {
+      updated[index] = { ...updated[index], field: field ?? '' };
+    }
+    setOrderList(updated);
+    saveColumns(columns, formatOrderBy(updated));
+  };
+
+  const changeOrderDesc = (index: number, desc: boolean) => {
+    const updated = [...orderList];
+    updated[index] = { ...updated[index], desc };
+    setOrderList(updated);
+    saveColumns(columns, formatOrderBy(updated));
+  };
+
+  const addOrderItem = () => setOrderList([...orderList, EMPTY_ORDER_ITEM]);
+
+  const changeGroupBy = (value?: string) => {
     const v = value ?? '';
     const isDate = attrType(v) === 'TypeDateTime';
-    setOrderBy(v);
+    setGroupBy(v);
     if (!isDate) {
       setDateTimePart('');
       setDateTimeInterval('');
@@ -388,13 +436,8 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
     align-items: center;
     flex-wrap: wrap;
   `;
-  const isNotStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  };
+  const checkboxLabelStyle: React.CSSProperties = { cursor: 'pointer', margin: 0, gap: 6, height: 32 };
+
 
   return (
     <>
@@ -490,14 +533,14 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                 placeholder="GroupBy"
                 isLoading={loadingAttrs}
                 isClearable
-                value={orderBy ? { label: orderBy, value: orderBy } : undefined}
+                value={groupBy ? { label: groupBy, value: groupBy } : undefined}
                 options={attributes}
-                onChange={(v) => changeOrderBy(v?.value)}
+                onChange={(v) => changeGroupBy(v?.value)}
                 width={20}
               />
             </InlineField>
           </InlineFieldRow>
-          {attrType(orderBy) === 'TypeDateTime' && (
+          {attrType(groupBy) === 'TypeDateTime' && (
             <>
               <InlineFieldRow>
                 <InlineField label="DateTimePart" labelWidth={16}>
@@ -512,7 +555,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                       if (part !== 'Time') {
                         setDateTimeInterval('');
                       }
-                      saveColumns(columns, orderBy, part, part === 'Time' ? dateTimeInterval : '');
+                      saveColumns(columns, groupBy, part, part === 'Time' ? dateTimeInterval : '');
                     }}
                     width={20}
                   />
@@ -525,7 +568,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                       placeholder="e.g. 1h, 1m"
                       value={dateTimeInterval}
                       onChange={(e) => setDateTimeInterval(e.currentTarget.value)}
-                      onBlur={(e) => saveColumns(columns, orderBy, dateTimePart, e.currentTarget.value)}
+                      onBlur={(e) => saveColumns(columns, groupBy, dateTimePart, e.currentTarget.value)}
                       width={20}
                     />
                   </InlineField>
@@ -536,16 +579,47 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
         </>
       ) : (
         <InlineFieldRow>
-          <InlineField label="OrderBy" labelWidth={16}>
-            <Select
-              placeholder="OrderBy"
-              isLoading={loadingAttrs}
-              isClearable
-              value={orderBy ? { label: orderBy, value: orderBy } : undefined}
-              options={attributes}
-              onChange={(v) => changeOrderBy(v?.value)}
-              width={20}
-            />
+          <InlineField label="OrderBy" labelWidth={16} grow>
+            <div
+              className={css`
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                align-items: center;
+              `}
+            >
+              {orderList.map((item, index) => (
+                <div
+                  key={index}
+                  className={css`
+                    display: inline-flex;
+                    gap: 4px;
+                    align-items: center;
+                  `}
+                >
+                  <Select
+                    placeholder="OrderBy"
+                    isLoading={loadingAttrs}
+                    isClearable
+                    value={item.field ? { label: item.field, value: item.field } : undefined}
+                    options={attributes}
+                    onChange={(v) => changeOrderField(index, v?.value)}
+                    width={20}
+                  />
+                  <label className="gf-form-label" style={{ ...checkboxLabelStyle, width: 80 }}>
+                    <input
+                      type="checkbox"
+                      checked={item.desc}
+                      onChange={(e) => changeOrderDesc(index, e.currentTarget.checked)}
+                    />
+                    Desc
+                  </label>
+                </div>
+              ))}
+              <a className="gf-form-label" onClick={addOrderItem}>
+                <Icon name="plus" />
+              </a>
+            </div>
           </InlineField>
         </InlineFieldRow>
       )}
@@ -601,7 +675,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                       updateCondition(i, { Operator: resolvedOp, Values: defaultValues(op, vals) });
                     }}
                   />
-                  <label style={isNotStyle}>
+                  <label className="gf-form-label" style={checkboxLabelStyle}>
                     <input
                       type="checkbox"
                       checked={!!c.IsNot}
@@ -648,7 +722,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                   setNewValues(defaultValues(op, newValues));
                 }}
               />
-              <label style={isNotStyle}>
+              <label className="gf-form-label" style={checkboxLabelStyle}>
                 <input type="checkbox" checked={newIsNot} onChange={(e) => setNewIsNot(e.target.checked)} />
                 Is Not
               </label>
