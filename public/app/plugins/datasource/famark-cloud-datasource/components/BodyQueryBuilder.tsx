@@ -261,6 +261,9 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
     setOrderList(parseOrderBy(parsed.orderBy));
     setDateTimePart(parsed.dateTimePart);
     setDateTimeInterval(parsed.dateTimeInterval);
+    if ((parsed.filter?.Conditions?.length ?? 0) > 0) {
+      setPendingCondition(null);
+    }
   }, [body, isStats]);
 
   // ── Fetch attributes when entity changes ──
@@ -383,7 +386,15 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
 
   // ── Filter Actions ──
 
-  const removeCondition = (index: number) => saveFilter(conditions.filter((_, i) => i !== index));
+  // If last row, clear it back to blank instead of deleting
+  const removeCondition = (index: number) => {
+    if (conditions.length === 1) {
+      saveFilter([]);
+      setPendingCondition(EMPTY_CONDITION);
+    } else {
+      saveFilter(conditions.filter((_, i) => i !== index));
+    }
+  };
 
   // Update an existing condition and save immediately
   const updateCondition = (index: number, changes: any) => {
@@ -405,21 +416,18 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
       changes = { ...changes, Operator: 0, Values: [''] };
     }
     if (isNew) {
-      setPendingCondition({ ...pendingCondition, ...changes });
-    } else {
-      updateCondition(index, changes);
-    }
-  };
-
-  // Save pending condition when user clicks +
-  const addCondition = () => {
-    if (!pendingCondition.FieldName) {
+      const merged = { ...pendingCondition, ...changes };
+      if (merged.FieldName) {
+        saveFilter([...conditions, merged]);
+        setPendingCondition(null);
+      } else {
+        setPendingCondition(merged);
+      }
       return;
     }
-    saveFilter([...conditions, pendingCondition]);
-    setPendingCondition(EMPTY_CONDITION);
+    updateCondition(index, changes);
   };
-
+  const addCondition = () => setPendingCondition(EMPTY_CONDITION);
   /** Get the default values when switching operator */
   const defaultValues = (op: number, current: string[]): string[] => {
     if (op === TIMESERIES_OPERATOR) {
@@ -655,15 +663,16 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
               width: 100%;
             `}
           >
-            {[...conditions, pendingCondition].map((c: any, i: number) => {
+            {[...conditions, ...(pendingCondition ? [pendingCondition] : [])].map((c: any, i: number, all) => {
               const isNew = i === conditions.length;
+              const isLast = i === all.length - 1;
               const isTs = isTimeseries(c);
               const displayOp = isTs ? TIMESERIES_OPERATOR : c.Operator;
               const opts = getConditionOptions(isTs ? 'TypeDateTime' : attrType(c.FieldName));
               const vals: string[] = c.Values || [''];
 
               return (
-                <div key={i} className={rowStyle}>
+                <div key={`${i}-${c.FieldName}`} className={rowStyle}>
                   <Select
                     width={20}
                     placeholder="Attribute"
@@ -693,13 +702,14 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                     Is Not
                   </label>
                   <ValueInputs operator={displayOp} values={vals} onChange={(v) => setCondition(i, { Values: v })} />
-                  {isNew ? (
-                    <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={addCondition}>
-                      <Icon name="plus" />
-                    </div>
-                  ) : (
+                  {!isNew && (
                     <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={() => removeCondition(i)}>
                       <Icon name="trash-alt" />
+                    </div>
+                  )}
+                  {isLast && (
+                    <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={addCondition}>
+                      <Icon name="plus" />
                     </div>
                   )}
                 </div>
