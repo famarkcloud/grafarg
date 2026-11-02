@@ -94,6 +94,7 @@ interface OrderByItem {
 }
 
 const EMPTY_ORDER_ITEM: OrderByItem = { field: '', desc: false };
+const EMPTY_CONDITION = { FieldName: '', Operator: 0, Values: [''] };
 
 const parseOrderBy = (orderBy: string): OrderByItem[] => {
   const items = orderBy
@@ -250,13 +251,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
   const [dateTimeInterval, setDateTimeInterval] = useState('');
   const [attributes, setAttributes] = useState<Array<SelectableValue<string>>>([]);
   const [loadingAttrs, setLoadingAttrs] = useState(false);
-
-  // New condition form
-  const [newAttr, setNewAttr] = useState('');
-  const [newOperator, setNewOperator] = useState(0);
-  const [newValues, setNewValues] = useState<string[]>(['']);
-  const [newIsNot, setNewIsNot] = useState(false);
-  const [formKey, setFormKey] = useState(0);
+  const [pendingCondition, setPendingCondition] = useState<any>(EMPTY_CONDITION);
 
   // ── Sync state from body prop ──
   useEffect(() => {
@@ -388,31 +383,41 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
 
   // ── Filter Actions ──
 
-  const addCondition = () => {
-    if (!newAttr) {
-      return;
-    }
-    const resolvedOp = newOperator === TIMESERIES_OPERATOR ? 6 : newOperator;
-    const condition: any = { FieldName: newAttr, Operator: resolvedOp, Values: [...newValues] };
-    if (newIsNot) {
-      condition.IsNot = true;
-    }
-    saveFilter([...conditions, condition]);
-    // Reset form
-    setNewAttr('');
-    setNewOperator(0);
-    setNewValues(['']);
-    setNewIsNot(false);
-    setFormKey((k) => k + 1);
-  };
-
   const removeCondition = (index: number) => saveFilter(conditions.filter((_, i) => i !== index));
 
+  // Update an existing condition and save immediately
   const updateCondition = (index: number, changes: any) => {
-    const updated = conditions.map((c: any, i: number) => (i === index ? { ...c, ...changes } : c));
-    // Remove undefined keys from the updated condition
-    Object.keys(updated[index]).forEach((k) => updated[index][k] === undefined && delete updated[index][k]);
+    const condition = { ...conditions[index], ...changes };
+    if (!condition.FieldName) {
+      return; // don't save a condition without an attribute
+    }
+    const updated = [...conditions];
+    updated[index] = condition;
     saveFilter(updated);
+  };
+
+  // Route changes: blank row → stage in pendingCondition, existing row → save immediately
+  const setCondition = (index: number, changes: any) => {
+    const isNew = index === conditions.length;
+    const current = isNew ? pendingCondition : conditions[index];
+    // Reset operator and values if switching away from DateTime on a Timeseries condition
+    if (changes.FieldName !== undefined && isTimeseries(current) && attrType(changes.FieldName) !== 'TypeDateTime') {
+      changes = { ...changes, Operator: 0, Values: [''] };
+    }
+    if (isNew) {
+      setPendingCondition({ ...pendingCondition, ...changes });
+    } else {
+      updateCondition(index, changes);
+    }
+  };
+
+  // Save pending condition when user clicks +
+  const addCondition = () => {
+    if (!pendingCondition.FieldName) {
+      return;
+    }
+    saveFilter([...conditions, pendingCondition]);
+    setPendingCondition(EMPTY_CONDITION);
   };
 
   /** Get the default values when switching operator */
@@ -436,9 +441,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
     align-items: center;
     flex-wrap: wrap;
   `;
-  const checkboxLabelStyle: React.CSSProperties = { cursor: 'pointer', margin: 0, gap: 6, height: 32 };
-
-
+  const checkboxLabelStyle: React.CSSProperties = { cursor: 'pointer', width: 74 };
   return (
     <>
       {/* ── Columns ── */}
@@ -474,7 +477,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                           opacity: 0.7;
                         `}
                       >
-                        +
+                        ,
                       </span>
                     )}
                     <div
@@ -579,13 +582,22 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
         </>
       ) : (
         <InlineFieldRow>
-          <InlineField label="OrderBy" labelWidth={16} grow>
+          <InlineField
+            label="OrderBy"
+            labelWidth={16}
+            grow
+            className={css`
+              flex: 1 1 0;
+              min-width: 0;
+            `}
+          >
             <div
               className={css`
                 display: flex;
                 flex-wrap: wrap;
                 gap: 4px;
                 align-items: center;
+                width: 100%;
               `}
             >
               {orderList.map((item, index) => (
@@ -606,7 +618,7 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                     onChange={(v) => changeOrderField(index, v?.value)}
                     width={20}
                   />
-                  <label className="gf-form-label" style={{ ...checkboxLabelStyle, width: 80 }}>
+                  <label className="gf-form-label" style={checkboxLabelStyle}>
                     <input
                       type="checkbox"
                       checked={item.desc}
@@ -643,7 +655,8 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
               width: 100%;
             `}
           >
-            {conditions.map((c: any, i: number) => {
+            {[...conditions, pendingCondition].map((c: any, i: number) => {
+              const isNew = i === conditions.length;
               const isTs = isTimeseries(c);
               const displayOp = isTs ? TIMESERIES_OPERATOR : c.Operator;
               const opts = getConditionOptions(isTs ? 'TypeDateTime' : attrType(c.FieldName));
@@ -653,84 +666,45 @@ export const BodyQueryBuilder: React.FC<Props> = ({ datasource, entityId, header
                 <div key={i} className={rowStyle}>
                   <Select
                     width={20}
+                    placeholder="Attribute"
                     options={attributes}
-                    value={
-                      attributes.find((a) => a.value === c.FieldName) || { label: c.FieldName, value: c.FieldName }
-                    }
-                    onChange={(v) => updateCondition(i, { FieldName: v.value })}
+                    value={c.FieldName ? { label: c.FieldName, value: c.FieldName } : null}
+                    onChange={(v) => setCondition(i, { FieldName: v?.value || '' })}
                     isLoading={loadingAttrs}
                   />
                   <Select
                     width={20}
                     options={opts}
-                    value={
-                      opts.find((o) => o.value === displayOp) || {
-                        label: CONDITION_LABELS[c.Operator] || String(c.Operator),
-                        value: c.Operator,
-                      }
-                    }
+                    value={opts.find((o) => o.value === displayOp)}
                     onChange={(v) => {
                       const op = v.value!;
-                      const resolvedOp = op === TIMESERIES_OPERATOR ? 6 : op;
-                      updateCondition(i, { Operator: resolvedOp, Values: defaultValues(op, vals) });
+                      setCondition(i, {
+                        Operator: op === TIMESERIES_OPERATOR ? 6 : op,
+                        Values: defaultValues(op, vals),
+                      });
                     }}
                   />
                   <label className="gf-form-label" style={checkboxLabelStyle}>
                     <input
                       type="checkbox"
                       checked={!!c.IsNot}
-                      onChange={(e) => updateCondition(i, { IsNot: e.target.checked || undefined })}
+                      onChange={(e) => setCondition(i, { IsNot: e.target.checked })}
                     />
                     Is Not
                   </label>
-                  <ValueInputs operator={displayOp} values={vals} onChange={(v) => updateCondition(i, { Values: v })} />
-                  <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={() => removeCondition(i)}>
-                    <Icon name="trash-alt" />
-                  </div>
+                  <ValueInputs operator={displayOp} values={vals} onChange={(v) => setCondition(i, { Values: v })} />
+                  {isNew ? (
+                    <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={addCondition}>
+                      <Icon name="plus" />
+                    </div>
+                  ) : (
+                    <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={() => removeCondition(i)}>
+                      <Icon name="trash-alt" />
+                    </div>
+                  )}
                 </div>
               );
             })}
-
-            {/* New condition form */}
-            <div key={formKey} className={rowStyle}>
-              <Select
-                width={20}
-                placeholder="Attribute"
-                options={attributes}
-                value={
-                  newAttr ? attributes.find((a) => a.value === newAttr) || { label: newAttr, value: newAttr } : null
-                }
-                onChange={(v) => {
-                  setNewAttr(v?.value || '');
-                  // Reset operator if switching away from DateTime
-                  if (attrType(v?.value || '') !== 'TypeDateTime' && newOperator === TIMESERIES_OPERATOR) {
-                    setNewOperator(0);
-                    setNewValues(['']);
-                  }
-                }}
-                isLoading={loadingAttrs}
-                isClearable
-              />
-              <Select
-                width={20}
-                placeholder="Condition"
-                options={getConditionOptions(attrType(newAttr))}
-                value={getConditionOptions(attrType(newAttr)).find((o) => o.value === newOperator)}
-                onChange={(v) => {
-                  const op = v.value!;
-                  setNewOperator(op);
-                  setNewValues(defaultValues(op, newValues));
-                }}
-              />
-              <label className="gf-form-label" style={checkboxLabelStyle}>
-                <input type="checkbox" checked={newIsNot} onChange={(e) => setNewIsNot(e.target.checked)} />
-                Is Not
-              </label>
-              <ValueInputs operator={newOperator} values={newValues} onChange={setNewValues} />
-              <div className="gf-form-label" style={{ cursor: 'pointer' }} onClick={addCondition}>
-                <Icon name="plus" />
-              </div>
-            </div>
           </div>
         </InlineField>
       </InlineFieldRow>
