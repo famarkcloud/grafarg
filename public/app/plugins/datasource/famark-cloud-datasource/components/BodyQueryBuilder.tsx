@@ -8,7 +8,18 @@ import { Pair } from '../types';
 // ── Constants ──
 
 const ATTRIBUTE_PATH = '/System_Attribute/RetrieveMultipleRecords';
-const AGGREGATIONS = ['Get_Count', 'Get_Sum', 'Get_Avg', 'Get_StdDev', 'Get_Max', 'Get_Min'];
+const AGGREGATIONS = [
+  'Get_Count',
+  'Get_Sum',
+  'Get_Avg',
+  'Get_Dev',
+  'Get_Max',
+  'Get_Min',
+  'Get_P50',
+  'Get_P90',
+  'Get_P95',
+  'Get_P99',
+];
 const AGGREGATION_OPTIONS = AGGREGATIONS.map((a) => ({ label: `${a}_`, value: a }));
 
 const CONDITION_LABELS = [
